@@ -1,87 +1,76 @@
 
 from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.modules import resource_management
 
 inventory_bp = Blueprint("resource", __name__, url_prefix="/inventory")
 
 
-# TODO: separate validation and business logic (service) from endpoint (presentation)
+
+@inventory_bp.post("/add")
+def add_resource_record():
+
+    # TODO: Implement access control to ensure only admin users can create records
+
+    resource_type = request.json.get("type", None)
+    data = request.json.get("data", None)
+
+    if not resource_type or not data:
+        return {"error": "Missing required fields"}, 400
+
+    try:
+        record = resource_management.create_resource(resource_type, data)
+        return {f"{resource_type}": record}, 201
+    except (TypeError, ValueError) as e:
+        return {"error": str(e)}, 400
 
 
-# @inventory_bp.post("/add")
-# def add_resource_record():
+@inventory_bp.put("/<resource_type>/<int:resource_id>")
+def update_resource_record(resource_type, resource_id):
 
-#     
-#     resource_type = request.json.get("type", None)
-#     data = request.json.get("data", None)
+    # TODO: Implement access control to ensure only admin users can update records
 
-#     if not resource_type or not data:
-#         return {"error": "Missing required fields"}, 400
+    data = request.json.get("data", None)
+    
+    if not resource_type or not data:
+        return {"error": "Missing required fields"}, 400
 
-#     if resource_type == "book":
-#         resource = Book(**resource_data)
-#     elif resource_type == "journal":
-#         resource = Journal(**resource_data)
-#     elif resource_type == "archival":
-#         resource = ArchivalItem(**resource_data)
-#     elif resource_type == "room":
-#         resource = Room(**resource_data)
-#     else:
-#         return {"error": "Invalid resource type"}, 400
+    try:
+        new_record = resource_management.update_resource(resource_type, resource_id, data)
 
-#     try:
-#         record = create(resource.category.value, resource.to_dict())
-#         return {"record": f"{record}"}, 201
-#     except Exception as e:
-#         return {"error": str(e)}, 500
+        if new_record is None:
+            return {"error": "Resource not found"}, 404
+
+        return {f"{resource_type}": new_record}, 200
+    except (TypeError, ValueError) as e:
+        return {"error": str(e)}, 400
 
 
-# @inventory_bp.get("/<resource_type>")
-# def get_all_resource_records(resource_type):
+@inventory_bp.delete("/<resource_type>/<int:resource_id>")
+def delete_resource_record(resource_type, resource_id):
+    try:
+        deleted = resource_management.delete_resource(resource_type, resource_id)
+    except ValueError as e:
+        return {"error": str(e)}, 500
 
-#     if resource_type not in ["book", "journal", "archival", "room"]:
-#         return {"error": "Invalid resource type"}, 400
+    if deleted is None:
+        return {"error": "Resource not found"}, 404
+    
+    if deleted is False:
+        return {"error": "Resource has an active reservation"}, 409
 
-#     try:
-#         records = get_all_records(f"{resource_type}")
-#         return {f"{resource_type}": records}, 200
-#     except Exception as e:
-#         return {"error": str(e)}, 500
-
-
-# @inventory_bp.get("/<resource_type>/<int:resource_id>")
-# def get_resource_record(resource_type, resource_id):
-
-#     if resource_type not in ["book", "journal", "archival", "room"]:
-#         return {"error": "Invalid resource type"}, 400
-
-#     try:
-#         record = get_record(f"{resource_type}", resource_id)
-#         if record:
-#             return {f"{resource_type}": record}, 200
-#         else:
-#             return {"error": f"{resource_type.capitalize()} not found"}, 404
-#     except Exception as e:
-#         return {"error": str(e)}, 500
+    return {"message": "Resource deleted"}, 200
 
 
-# @inventory_bp.put("/<resource_type>/<int:resource_id>")
-# def update_resource_record(resource_type, resource_id):
+@inventory_bp.get("/available")
+def get_available_resources():
+    resource_type = request.args.get("type")
 
-#     # TODO: Implement access control to ensure only admin users can update records
+    try:
+        records = resource_management.list_available_resources(resource_type)
+        return {"resources": records}, 200
+    except ValueError as e:
+        return {"error": str(e)}, 500
 
-#     if resource_type not in ["book", "journal", "archival", "room"]:
-#         return {"error": "Invalid resource type"}, 400
 
-#     new_record = request.json.get("data", None)
-#     if not new_record:
-#         return {"error": "Missing required fields"}, 400
 
-#     try:
-#         updated_record = update(f"{resource_type}", resource_id, new_record)
-#         if updated_record:
-#             return {f"{resource_type}": updated_record}, 200
-#         else:
-#             return {"error": f"{resource_type.capitalize()} not found"}, 404
-#     except Exception as e:
-#         return {"error": str(e)}, 500

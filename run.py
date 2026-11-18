@@ -1,5 +1,5 @@
 from flask import Flask
-from app.modules.resource_management import inventory_bp
+from app.routes.resources import inventory_bp
 
 app = Flask(__name__)
 
