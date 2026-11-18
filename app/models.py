@@ -41,7 +41,32 @@ class FineReason(str, Enum):
     LOST = "lost"
     DAMAGED = "damaged"
 
+class VisitorType(str, Enum):
+    UNDERGRAD = "undergraduate"
+    POSTGRAD = "postgraduate"
+    EXTERNAL = "external"
 
+
+@dataclass
+class Visitor:
+    id: int | None = field(default=None, kw_only=True)
+    student_id: int | None = field(default=None, kw_only=True)
+    name: str 
+    phone_number: str
+    type: VisitorType
+    faculty: str | None = field(default=None, kw_only=True)
+    purpose: str
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "student_id": self.student_id,
+            "name": self.name,
+            "phone_number": self.phone_number,
+            "type": self.type.value,
+            "faculty": self.faculty,
+            "purpose": self.purpose
+        }
 
 
 @dataclass

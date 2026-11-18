@@ -7,13 +7,14 @@ from enum import Enum
 
 DB_DIR = Path("./data")
 RESOURCE_PREFIXES = {
-    "book": 193,
-    "room": 294,
-    "journal": 395,
-    "archival": 496,
-    "reservation": 597,
-    "fine": 698,
-    "sale": 799,
+    "visitor": 192,
+    "book": 293,
+    "room": 394,
+    "journal": 495,
+    "archival": 596,
+    "reservation": 697,
+    "fine": 798,
+    "sale": 899,
 }
 
 

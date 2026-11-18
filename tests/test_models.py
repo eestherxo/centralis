@@ -1,6 +1,7 @@
 from datetime import date, time
 
 from app.models import (
+    Visitor,
     ArchivalItem,
     ArchivalReservation,
     Book,
@@ -19,6 +20,40 @@ from app.models import (
 )
 
 
+from app.models import Visitor, VisitorType
+
+
+def test_undergraduate_visitor_model():
+    visitor = Visitor(
+        "Taylor Smith",
+        "555-0123",
+        VisitorType.UNDERGRAD,
+        "library research",
+        student_id=123456,
+        faculty="Science",
+    )
+    data = visitor.to_dict()
+    print(f"\n{data}\n")
+
+    assert visitor.type is VisitorType.UNDERGRAD
+    assert visitor.student_id == 123456
+    assert visitor.faculty == "Science"
+
+
+def test_external_visitor_model():
+    visitor = Visitor(
+        "Morgan Brown",
+        "555-0456",
+        VisitorType.EXTERNAL,
+        "attend a seminar",
+    )
+    data = visitor.to_dict()
+    print(f"{data}\n")
+
+    assert visitor.type is VisitorType.EXTERNAL
+    assert visitor.student_id is None
+    assert visitor.faculty is None
+
 def test_book_model():
     book = Book(
         name="Animal Farm",
@@ -28,7 +63,7 @@ def test_book_model():
     )
 
     data = book.to_dict()
-    print(f"\n{data}\n")
+    print(f"{data}\n")
 
     assert book.id is None
     assert book.status is ResourceStatus.AVAILABLE

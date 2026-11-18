@@ -15,11 +15,11 @@ book = Book("Animal Farm", "George Orwell", 6465, "Dystopian")
 
 def test_create_book_model_in_file(temp_data_dir):
     data = book.to_dict()
-    print(f"\n{data}\n")
 
     record = data_access.create("book", data)
+    print(record)
 
-    assert record["id"] == 19300001
+    assert record["id"] == 29300001
     assert record["resource_type"] == "book"
     assert record["name"] == "Animal Farm"
 
