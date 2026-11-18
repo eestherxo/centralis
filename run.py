@@ -1,12 +1,10 @@
 from flask import Flask
+from app.modules.resource_management import inventory_bp
 
 app = Flask(__name__)
 
 
-@app.route("/")
-def hello_world():
-    return "<p>Hello, World!</p>"
-
+app.register_blueprint(inventory_bp, url_prefix="/inventory")
 
 if __name__ == "__main__":
     app.run(debug=True)
