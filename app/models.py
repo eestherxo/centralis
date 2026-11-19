@@ -51,6 +51,7 @@ class VisitorType(str, Enum):
 class Visitor:
     id: int | None = field(default=None, kw_only=True)
     student_id: int | None = field(default=None, kw_only=True)
+    id_number: str | None = field(default=None, kw_only=True)
     name: str 
     phone_number: str
     type: VisitorType
@@ -61,6 +62,7 @@ class Visitor:
         return {
             "id": self.id,
             "student_id": self.student_id,
+            "id_number": self.id_number,
             "name": self.name,
             "phone_number": self.phone_number,
             "type": self.type.value,

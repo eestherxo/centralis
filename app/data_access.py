@@ -15,6 +15,7 @@ RESOURCE_PREFIXES = {
     "reservation": 697,
     "fine": 798,
     "sale": 899,
+    "visit": 1000,
 }
 
 
