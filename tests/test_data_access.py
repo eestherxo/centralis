@@ -24,6 +24,16 @@ def test_create_book_model_in_file(temp_data_dir):
     assert record["name"] == "Animal Farm"
 
 
+def test_create_record_makes_missing_data_directory(tmp_path, monkeypatch):
+    data_dir = tmp_path / "nested" / "data"
+    monkeypatch.setattr(data_access, "DB_DIR", data_dir)
+
+    record = data_access.create("visitor", {"name": "Taylor Smith"})
+
+    assert data_dir.is_dir()
+    assert data_access.get_all_records("visitor") == [record]
+
+
 def test_read_book_from_file(temp_data_dir):
     created = data_access.create("book", book.to_dict())
 

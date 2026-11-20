@@ -57,6 +57,7 @@ def _read_file(file_name: str):
 def _write_file(file_name: str, records: list):
 
     file_path = get_file_path(file_name)
+    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
     with open(file_path, "w") as file:
         json.dump(records, file, indent=4, cls=JSONEncoder)
