@@ -54,6 +54,41 @@ def test_registration_rejects_missing_and_invalid_fields(client):
     assert data_access.get_all_records("visitor") == []
 
 
+@pytest.mark.parametrize("visitor_type", ["undergraduate", "postgraduate"])
+def test_student_registration_requires_id_number(client, visitor_type):
+    response = client.post(
+        "/visitors/register",
+        json=visitor_data(type=visitor_type, id_number=""),
+    )
+
+    assert response.status_code == 400
+    assert "id_number" in response.get_json()["fields"]
+    assert data_access.get_all_records("visitor") == []
+
+
+def test_external_registration_does_not_require_student_fields(client):
+    response = client.post(
+        "/visitors/register",
+        json=visitor_data(type="external", id_number=None, faculty=None),
+    )
+
+    assert response.status_code == 201
+    visitor = response.get_json()["visitor"]
+    assert visitor["id_number"] is None
+    assert visitor["faculty"] is None
+
+
+def test_external_registration_rejects_an_id_number(client):
+    response = client.post(
+        "/visitors/register",
+        json=visitor_data(type="external", id_number="ID-123"),
+    )
+
+    assert response.status_code == 400
+    assert "id_number" in response.get_json()["fields"]
+    assert data_access.get_all_records("visitor") == []
+
+
 def test_duplicate_registration_is_rejected(client):
     client.post("/visitors/register", json=visitor_data())
 
@@ -113,3 +148,23 @@ def test_check_out_without_active_check_in_is_rejected(client):
 
     assert response.status_code == 409
     assert len(data_access.get_all_records("visit")) == 1
+
+
+def test_external_visitor_can_check_in_and_out_by_visitor_id(client):
+    registration = client.post(
+        "/visitors/register",
+        json=visitor_data(type="external", id_number="", faculty=""),
+    )
+    visitor_id = registration.get_json()["visitor"]["id"]
+
+    check_out = client.post(
+        "/visitors/check-out", json={"visitor_id": visitor_id}
+    )
+    check_in = client.post(
+        "/visitors/check-in",
+        json={"visitor_id": visitor_id, "purpose": "Consultation"},
+    )
+
+    assert check_out.status_code == 200
+    assert check_in.status_code == 201
+    assert check_in.get_json()["visit"]["visitor_id"] == visitor_id
