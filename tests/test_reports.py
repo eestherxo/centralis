@@ -1,0 +1,456 @@
+"""Automated functional tests for SALISES User Story 03."""
+
+from copy import deepcopy
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import unittest
+
+from docx import Document
+
+try:
+    # Normal repository location: app/modules/reports.py
+    from app.modules.reports import (
+        NO_DATA_MESSAGE,
+        export_report_to_word,
+        generate_report,
+    )
+except ModuleNotFoundError:
+    # Allows this standalone copy to be tested before it is added to the repo.
+    from reports import NO_DATA_MESSAGE, export_report_to_word, generate_report
+
+
+ADMIN = "Administrator"
+START_DATE = "2026-11-01"
+END_DATE = "2026-11-30"
+
+
+class ReportTests(unittest.TestCase):
+    # TC-3.01: Visitor report generated successfully.
+    def test_01_visitor_report(self):
+        visits = [
+            {
+                "visitor_id": "V-001",
+                "visitor_name": "Maya Brown",
+                "visitor_type": "Undergraduate",
+                "visit_date": "2026-11-02",
+            },
+            {
+                "visitor_id": "V-001",
+                "visitor_name": "Maya Brown",
+                "visitor_type": "Undergraduate",
+                "visit_date": "2026-11-08",
+            },
+        ]
+
+        report = generate_report(
+            "visitor", visits, START_DATE, END_DATE, ADMIN
+        )
+
+        self.assertEqual(report["report_type"], "visitor")
+        self.assertEqual(report["records"][0]["visitor_name"], "Maya Brown")
+        self.assertEqual(report["records"][0]["visit_frequency"], 2)
+        self.assertEqual(
+            report["records"][0]["visit_dates"],
+            ["2026-11-02", "2026-11-08"],
+        )
+
+    # TC-3.02: Reservation report generated successfully.
+    def test_02_reservation_report(self):
+        reservations = [
+            {
+                "reservation_id": "RS-001",
+                "visitor": "Maya Brown",
+                "resource": "Seminar Room 1",
+                "reservation_date": "2026-11-10",
+                "status": "Approved",
+            }
+        ]
+
+        report = generate_report(
+            "reservation", reservations, START_DATE, END_DATE, ADMIN
+        )
+
+        self.assertEqual(report["records"][0]["resource"], "Seminar Room 1")
+        self.assertEqual(report["records"][0]["status"], "Approved")
+
+    # TC-3.03: Journal-sales report generated successfully.
+    def test_03_journal_sales_report(self):
+        sales = [
+            {
+                "sale_id": "S-001",
+                "journal": "Social and Economic Studies",
+                "quantity": 2,
+                "sale_date": "2026-11-12",
+                "total_amount": 5000.00,
+            }
+        ]
+
+        report = generate_report(
+            "journal_sales", sales, START_DATE, END_DATE, ADMIN
+        )
+
+        self.assertEqual(report["records"][0]["quantity"], 2)
+        self.assertEqual(report["records"][0]["total_amount"], 5000.00)
+
+    # TC-3.04: Fine report generated successfully.
+    def test_04_fines_report(self):
+        fines = [
+            {
+                "fine_id": "F-001",
+                "visitor": "Maya Brown",
+                "fine_type": "Overdue",
+                "amount": 150.00,
+                "resource": "Caribbean Development",
+                "date_issued": "2026-11-15",
+                "payment_status": "Unpaid",
+            }
+        ]
+
+        report = generate_report("fines", fines, START_DATE, END_DATE, ADMIN)
+
+        self.assertEqual(report["records"][0]["fine_type"], "Overdue")
+        self.assertEqual(report["records"][0]["amount"], 150.00)
+
+    # TC-3.05: A non-Administrator is denied access.
+    def test_05_non_administrator_denied(self):
+        with self.assertRaisesRegex(PermissionError, "Only an Administrator"):
+            generate_report("visitor", [], START_DATE, END_DATE, "Staff")
+
+    # TC-3.06: An invalid date range is rejected.
+    def test_06_invalid_date_range(self):
+        with self.assertRaisesRegex(ValueError, "start date"):
+            generate_report(
+                "visitor", [], "2026-11-30", "2026-11-01", ADMIN
+            )
+
+    # TC-3.07: No matching records produces the required message.
+    def test_07_no_data_available(self):
+        visits = [
+            {
+                "visitor_id": "V-001",
+                "visitor_name": "Maya Brown",
+                "visitor_type": "Undergraduate",
+                "visit_date": "2026-10-15",
+            }
+        ]
+
+        report = generate_report(
+            "visitor", visits, START_DATE, END_DATE, ADMIN
+        )
+
+        self.assertEqual(report["records"], [])
+        self.assertEqual(report["message"], NO_DATA_MESSAGE)
+
+    # TC-3.08: A report cannot be generated without a report type.
+    def test_08_report_type_required(self):
+        with self.assertRaisesRegex(ValueError, "report type"):
+            generate_report(None, [], START_DATE, END_DATE, ADMIN)
+
+    # TC-3.09: A logged-out user cannot directly access reporting.
+    def test_09_logged_out_user_denied(self):
+        with self.assertRaisesRegex(PermissionError, "login is required"):
+            generate_report("visitor", [], START_DATE, END_DATE, None)
+
+    # TC-3.10: Report values match storage and stored records are unchanged.
+    def test_10_stored_records_are_not_changed(self):
+        reservations = [
+            {
+                "reservation_id": "RS-002",
+                "visitor": "Daniel King",
+                "resource": "Meeting Room 2",
+                "reservation_date": "2026-11-11",
+                "status": "Pending",
+            }
+        ]
+        original = deepcopy(reservations)
+
+        report = generate_report(
+            "reservation", reservations, START_DATE, END_DATE, ADMIN
+        )
+
+        self.assertEqual(reservations, original)
+        self.assertEqual(report["records"][0]["reservation_id"], "RS-002")
+        self.assertEqual(report["records"][0]["status"], "Pending")
+
+    # TC-3.11: A single-day visitor range includes that day's visits.
+    def test_11_single_day_visitor_report(self):
+        visits = [
+            {
+                "visitor_id": "V-002",
+                "visitor_name": "Daniel King",
+                "visitor_type": "Postgraduate",
+                "visit_date": "2026-11-14",
+            },
+            {
+                "visitor_id": "V-002",
+                "visitor_name": "Daniel King",
+                "visitor_type": "Postgraduate",
+                "visit_date": "2026-11-15",
+            },
+        ]
+
+        report = generate_report(
+            "visitor", visits, "2026-11-14", "2026-11-14", ADMIN
+        )
+
+        self.assertEqual(report["records"][0]["visit_dates"], ["2026-11-14"])
+        self.assertEqual(report["records"][0]["visit_frequency"], 1)
+
+    # TC-3.12: Visitor categories remain distinguishable in the report.
+    def test_12_visitor_categories(self):
+        visits = [
+            {
+                "visitor_id": "V-003",
+                "visitor_name": "Leah Grant",
+                "visitor_type": "Undergraduate",
+                "visit_date": "2026-11-03",
+            },
+            {
+                "visitor_id": "V-004",
+                "visitor_name": "Owen Clarke",
+                "visitor_type": "Outside Personnel",
+                "visit_date": "2026-11-04",
+            },
+        ]
+
+        report = generate_report(
+            "visitor", visits, START_DATE, END_DATE, ADMIN
+        )
+
+        categories = {record["visitor_type"] for record in report["records"]}
+        self.assertEqual(categories, {"Undergraduate", "Outside Personnel"})
+
+    # TC-3.13: Reservation statuses are reported separately.
+    def test_13_reservation_statuses(self):
+        reservations = [
+            {
+                "visitor": "Maya Brown",
+                "resource": "Seminar Room 1",
+                "reservation_date": "2026-11-10",
+                "status": "Approved",
+            },
+            {
+                "visitor": "Daniel King",
+                "resource": "Meeting Room 2",
+                "reservation_date": "2026-11-11",
+                "status": "Rejected",
+            },
+        ]
+
+        report = generate_report(
+            "reservation", reservations, START_DATE, END_DATE, ADMIN
+        )
+
+        self.assertEqual(
+            {record["status"] for record in report["records"]},
+            {"Approved", "Rejected"},
+        )
+
+    # TC-3.14: Different reserved resource types are shown.
+    def test_14_reservation_resource_types(self):
+        reservations = [
+            {
+                "visitor": "Maya Brown",
+                "resource": "Seminar Room 1",
+                "reservation_date": "2026-11-10",
+                "status": "Approved",
+            },
+            {
+                "visitor": "Daniel King",
+                "resource": "Projector 1",
+                "reservation_date": "2026-11-11",
+                "status": "Approved",
+            },
+        ]
+
+        report = generate_report(
+            "reservation", reservations, START_DATE, END_DATE, ADMIN
+        )
+
+        self.assertEqual(
+            {record["resource"] for record in report["records"]},
+            {"Seminar Room 1", "Projector 1"},
+        )
+
+    # TC-3.15: Multiple sales of the same journal are all included.
+    def test_15_multiple_sales_same_journal(self):
+        sales = [
+            {
+                "journal": "Social and Economic Studies",
+                "quantity": 1,
+                "sale_date": "2026-11-12",
+                "total_amount": 2500.00,
+            },
+            {
+                "journal": "Social and Economic Studies",
+                "quantity": 3,
+                "sale_date": "2026-11-13",
+                "total_amount": 7500.00,
+            },
+        ]
+
+        report = generate_report(
+            "journal_sales", sales, START_DATE, END_DATE, ADMIN
+        )
+
+        self.assertEqual(len(report["records"]), 2)
+        self.assertEqual(sum(item["quantity"] for item in report["records"]), 4)
+
+    # TC-3.16: Different journals sold on the same date remain separate.
+    def test_16_different_journals_same_date(self):
+        sales = [
+            {
+                "journal": "Journal A",
+                "quantity": 1,
+                "sale_date": "2026-11-12",
+                "total_amount": 2000.00,
+            },
+            {
+                "journal": "Journal B",
+                "quantity": 2,
+                "sale_date": "2026-11-12",
+                "total_amount": 4000.00,
+            },
+        ]
+
+        report = generate_report(
+            "journal_sales", sales, START_DATE, END_DATE, ADMIN
+        )
+
+        self.assertEqual(
+            {record["journal"] for record in report["records"]},
+            {"Journal A", "Journal B"},
+        )
+
+    # TC-3.17: Different fine types remain distinguishable.
+    def test_17_fine_types(self):
+        fines = [
+            {
+                "visitor": "Maya Brown",
+                "fine_type": "Overdue",
+                "amount": 150.00,
+                "resource": "Book A",
+                "date_issued": "2026-11-15",
+                "payment_status": "Unpaid",
+            },
+            {
+                "visitor": "Daniel King",
+                "fine_type": "Damaged",
+                "amount": 1200.00,
+                "resource": "Book B",
+                "date_issued": "2026-11-16",
+                "payment_status": "Unpaid",
+            },
+        ]
+
+        report = generate_report("fines", fines, START_DATE, END_DATE, ADMIN)
+
+        self.assertEqual(
+            {record["fine_type"] for record in report["records"]},
+            {"Overdue", "Damaged"},
+        )
+
+    # TC-3.18: Paid and unpaid fines are both reported accurately.
+    def test_18_fine_payment_statuses(self):
+        fines = [
+            {
+                "visitor": "Maya Brown",
+                "fine_type": "Overdue",
+                "amount": 150.00,
+                "resource": "Book A",
+                "date_issued": "2026-11-15",
+                "payment_status": "Paid",
+            },
+            {
+                "visitor": "Daniel King",
+                "fine_type": "Damaged",
+                "amount": 1200.00,
+                "resource": "Book B",
+                "date_issued": "2026-11-16",
+                "payment_status": "Unpaid",
+            },
+        ]
+
+        report = generate_report("fines", fines, START_DATE, END_DATE, ADMIN)
+
+        self.assertEqual(
+            {record["payment_status"] for record in report["records"]},
+            {"Paid", "Unpaid"},
+        )
+
+    # TC-3.19: A generated report can be exported to Microsoft Word.
+    def test_19_export_report_to_word(self):
+        visits = [
+            {
+                "visitor_id": "V-001",
+                "visitor_name": "Maya Brown",
+                "visitor_type": "Undergraduate",
+                "visit_date": "2026-11-02",
+            },
+            {
+                "visitor_id": "V-002",
+                "visitor_name": "Omar Lewis",
+                "visitor_type": "Outside Personnel",
+                "visit_date": "2026-11-03",
+            },
+        ]
+        report = generate_report(
+            "visitor", visits, START_DATE, END_DATE, ADMIN
+        )
+
+        with TemporaryDirectory() as directory:
+            requested_path = Path(directory) / "visitor_report.docx"
+            exported_path = export_report_to_word(report, requested_path)
+
+            self.assertTrue(exported_path.exists())
+            self.assertEqual(exported_path.suffix, ".docx")
+
+            exported_document = Document(exported_path)
+            paragraph_text = "\n".join(
+                paragraph.text for paragraph in exported_document.paragraphs
+            )
+            self.assertIn("Visitor Report", paragraph_text)
+            self.assertIn(
+                f"Date range: {START_DATE} to {END_DATE}", paragraph_text
+            )
+
+            table = exported_document.tables[0]
+            headings = [cell.text for cell in table.rows[0].cells]
+            self.assertEqual(
+                headings,
+                [
+                    "Visitor ID",
+                    "Visitor Name",
+                    "Visitor Type",
+                    "Visit Dates",
+                    "Visit Frequency",
+                ],
+            )
+
+            exported_rows = [
+                [cell.text for cell in row.cells] for row in table.rows[1:]
+            ]
+            self.assertIn(
+                [
+                    "V-001",
+                    "Maya Brown",
+                    "Undergraduate",
+                    "2026-11-02",
+                    "1",
+                ],
+                exported_rows,
+            )
+            self.assertIn(
+                [
+                    "V-002",
+                    "Omar Lewis",
+                    "Outside Personnel",
+                    "2026-11-03",
+                    "1",
+                ],
+                exported_rows,
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()
