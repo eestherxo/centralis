@@ -7,14 +7,15 @@ from enum import Enum
 
 DB_DIR = Path("./data")
 RESOURCE_PREFIXES = {
-    "visitor": 192,
-    "book": 293,
-    "room": 394,
-    "journal": 495,
-    "archival": 596,
-    "reservation": 697,
-    "fine": 798,
-    "sale": 899,
+    "visitor": 191,
+    "book": 292,
+    "room": 393,
+    "journal": 494,
+    "archival": 595,
+    "reservation": 696,
+    "fine": 797,
+    "sale": 898,
+    "visit": 999,
 }
 
 
@@ -56,6 +57,7 @@ def _read_file(file_name: str):
 def _write_file(file_name: str, records: list):
 
     file_path = get_file_path(file_name)
+    # Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
     with open(file_path, "w") as file:
         json.dump(records, file, indent=4, cls=JSONEncoder)

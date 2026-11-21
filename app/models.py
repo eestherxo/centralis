@@ -50,7 +50,7 @@ class VisitorType(str, Enum):
 @dataclass
 class Visitor:
     id: int | None = field(default=None, kw_only=True)
-    student_id: int | None = field(default=None, kw_only=True)
+    student_id: str | None = field(default=None, kw_only=True)
     name: str 
     phone_number: str
     type: VisitorType
