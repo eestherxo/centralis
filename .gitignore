@@ -1,5 +1,23 @@
+# Python
 .venv/
 __pycache__/
 .pytest_cache/
+*.py[cod]
+
+# Generated reports
 sample_word_reports/
-*.pyc
+
+# Node.js / Vue
+node_modules/
+dist/
+.vite/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment and data
+.env
+.env.*
+!.env.example
+/data/

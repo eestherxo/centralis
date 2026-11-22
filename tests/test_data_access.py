@@ -1,42 +1,70 @@
 import pytest
 from app import data_access
+from app.models import Book, ResourceCondition, ResourceStatus
 
 
-# Replaces the DB_DIR with a temporary directory for testing
 @pytest.fixture
 def temp_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(data_access, "DB_DIR", tmp_path)
     return tmp_path
 
 
-def test_create_and_read_record(temp_data_dir):
-    assert data_access.create("books", {"name": "Dune"}) is True
 
-    records = data_access.get_all_records("books")
-    assert len(records) == 1
-    assert records[0]["id"] == 1960001
-    assert records[0]["name"] == "Dune"
-    assert data_access.get_record("books", 1960001) == records[0]
+book = Book("Animal Farm", "George Orwell", 6465, "Dystopian")
 
 
-def test_update_record(temp_data_dir):
-    data_access.create("books", {"name": "Dune"})
+def test_create_book_model_in_file(temp_data_dir):
+    data = book.to_dict()
 
-    updated = data_access.update("books", 1960001, {"name": "Dune Messiah"})
+    record = data_access.create("book", data)
+    print(record)
+
+    assert record["id"] == 29300001
+    assert record["resource_type"] == "book"
+    assert record["name"] == "Animal Farm"
+
+
+def test_create_record_makes_data_directory(tmp_path, monkeypatch):
+    data_dir = tmp_path / "nested" / "data"
+    monkeypatch.setattr(data_access, "DB_DIR", data_dir)
+
+    record = data_access.create("visitor", {"name": "Taylor Smith"})
+
+    assert data_dir.is_dir()
+    assert data_access.get_all_records("visitor") == [record]
+
+
+def test_read_book_from_file(temp_data_dir):
+    created = data_access.create("book", book.to_dict())
+
+    assert data_access.get_record("book", created["id"]) == created
+    assert data_access.get_all_records("book") == [created]
+
+
+def test_update_book_in_file(temp_data_dir):
+    created = data_access.create("book", book.to_dict())
+
+    updated = data_access.update(
+        "book",
+        created["id"],
+        {
+            "name": "Animal Farm (updated)",
+            "status": ResourceStatus.RESERVED.value,
+            "condition": ResourceCondition.DAMAGED.value,
+        },
+    )
 
     assert updated is not None
-    assert updated["name"] == "Dune Messiah"
-    record = data_access.get_record("books", 1960001)
-    assert record is not None
-    assert record["name"] == "Dune Messiah"
+    assert updated["name"] == "Animal Farm (updated)"
+    assert updated["status"] == "reserved"
+    assert updated["condition"] == "damaged"
 
 
-def test_delete_record(temp_data_dir):
-    data_access.create("books", {"name": "Dune"})
+def test_delete_book_from_file(temp_data_dir):
+    created = data_access.create("book", book.to_dict())
 
-    assert data_access.delete("books", 1960001) is True
-    assert data_access.get_record("books", 1960001) is None
-    assert data_access.delete("books", 1960001) is False
+    assert data_access.delete("book", created["id"]) is True
+    assert data_access.get_record("book", created["id"]) is None
 
 
 def test_unknown_file_name_is_rejected():

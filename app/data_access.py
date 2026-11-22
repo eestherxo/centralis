@@ -7,10 +7,16 @@ from enum import Enum
 
 DB_DIR = Path("./data")
 RESOURCE_PREFIXES = {
-    "books": 196,
-    "rooms": 297,
-    "journals": 398,
-    "archival": 499,
+    "user": 100,
+    "visitor": 191,
+    "book": 292,
+    "room": 393,
+    "journal": 494,
+    "archival": 595,
+    "reservation": 696,
+    "fine": 797,
+    "sale": 898,
+    "visit": 999,
 }
 
 
@@ -19,7 +25,7 @@ class JSONEncoder(json.JSONEncoder):
 
     def default(self, o: Any) -> Any:
 
-        # convert date os to ISO format
+        # convert date object to ISO format
         if isinstance(o, (datetime, date)):
             return o.isoformat()
 
@@ -52,6 +58,7 @@ def _read_file(file_name: str):
 def _write_file(file_name: str, records: list):
 
     file_path = get_file_path(file_name)
+    Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
     with open(file_path, "w") as file:
         json.dump(records, file, indent=4, cls=JSONEncoder)
@@ -62,7 +69,7 @@ def _generate_id(file_name: str, records: list):
     prefix = RESOURCE_PREFIXES[file_name]
 
     if not records:
-        return prefix * 10000 + 1
+        return prefix * 100000 + 1
 
     prev_id = max(int(record["id"]) for record in records)
     return prev_id + 1
@@ -76,7 +83,7 @@ def create(file_name: str, record: dict):
     records.append(record)
     _write_file(file_name, records)
 
-    return True
+    return record
 
 
 def update(file_name: str, record_id: int, new_record: dict):
