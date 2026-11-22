@@ -139,6 +139,24 @@ def test_receipt_after_payment_confirmed(journal):
     assert receipt["date_sold"] == "2026-11-18"
 
 
+def test_receipt_pdf_not_given_before_payment(journal):
+    sale = journal_sales.record_sale(journal["id"], 1, "2026-11-18")
+
+    with pytest.raises(ValueError):
+        journal_sales.generate_receipt_pdf(sale["id"])
+
+
+def test_receipt_pdf_after_payment_confirmed(journal):
+    sale = journal_sales.record_sale(journal["id"], 3, "2026-11-18")
+    journal_sales.confirm_payment(sale["id"])
+
+    pdf = journal_sales.generate_receipt_pdf(sale["id"]).read()
+
+    assert pdf.startswith(b"%PDF")
+    for text in ["Social and Economic Studies", "$30.00", "2026-11-18", "Payment received"]:
+        assert text.encode() in pdf
+
+
 def test_receipt_unknown_sale():
     with pytest.raises(ValueError):
         journal_sales.generate_receipt(999999)

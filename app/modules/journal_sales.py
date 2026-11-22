@@ -1,4 +1,8 @@
 from datetime import date
+from io import BytesIO
+
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
 
 from app import data_access
 from app.models import Sale
@@ -84,6 +88,49 @@ def generate_receipt(sale_id):
         "sale_amount": sale["sale_amount"],
         "date_sold": sale["date_sold"],
     }
+
+
+def generate_receipt_pdf(sale_id):
+    # Uses generate_receipt, so the same rules apply (payment must be confirmed)
+    receipt = generate_receipt(sale_id)
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4, pageCompression=0)
+    width, height = A4
+
+    # Header
+    pdf.setFont("Helvetica-Bold", 20)
+    pdf.drawCentredString(width / 2, height - 80, "SALISES")
+    pdf.setFont("Helvetica", 12)
+    pdf.drawCentredString(width / 2, height - 100, "Journal Sales Receipt")
+    pdf.line(60, height - 115, width - 60, height - 115)
+
+    # Receipt details
+    details = [
+        ("Receipt / Sale ID", receipt["sale_id"]),
+        ("Journal", receipt["journal_name"]),
+        ("Quantity sold", receipt["quantity"]),
+        ("Total sale amount", f"${receipt['sale_amount']:.2f}"),
+        ("Date of sale", receipt["date_sold"]),
+    ]
+    y = height - 160
+    for label, value in details:
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(70, y, f"{label}:")
+        pdf.setFont("Helvetica", 12)
+        pdf.drawString(230, y, str(value))
+        y -= 30
+
+    # Payment confirmation
+    pdf.line(60, y, width - 60, y)
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(70, y - 30, "Payment received - confirmed by SALISES staff")
+    pdf.setFont("Helvetica-Oblique", 10)
+    pdf.drawCentredString(width / 2, 60, "Thank you for your purchase.")
+
+    pdf.save()
+    buffer.seek(0)
+    return buffer
 
 
 def list_sales():

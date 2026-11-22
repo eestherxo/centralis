@@ -66,14 +66,12 @@ def test_full_journal_sale_workflow(client):
 
     # Confirm payment, then get the receipt
     assert client.post(f"/sales/{sale['id']}/confirm-payment", headers=staff).status_code == 200
-    receipt = client.get(f"/sales/{sale['id']}/receipt", headers=staff).json["receipt"]
-    assert receipt == {
-        "sale_id": sale["id"],
-        "journal_name": "Social and Economic Studies",
-        "quantity": 2,
-        "sale_amount": 20.0,
-        "date_sold": "2026-11-18",
-    }
+    receipt = client.get(f"/sales/{sale['id']}/receipt", headers=staff)
+    assert receipt.status_code == 200
+    assert receipt.mimetype == "application/pdf"
+    assert receipt.data.startswith(b"%PDF")
+    for text in ["Social and Economic Studies", "$20.00", "2026-11-18", "Payment received"]:
+        assert text.encode() in receipt.data
 
     # The admin can use the saved sale in the existing journal sales report
     report = client.post(

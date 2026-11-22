@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.modules import journal_sales, authentication
 
@@ -61,10 +61,15 @@ def get_receipt(sale_id):
         return {"error": "Only staff and admins can generate receipts"}, 403
 
     try:
-        receipt = journal_sales.generate_receipt(sale_id)
+        pdf = journal_sales.generate_receipt_pdf(sale_id)
     except ValueError as e:
         if "not found" in str(e):
             return {"error": str(e)}, 404
         return {"error": str(e)}, 409
 
-    return {"receipt": receipt}, 200
+    return send_file(
+        pdf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"receipt-{sale_id}.pdf",
+    )

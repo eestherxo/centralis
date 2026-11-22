@@ -130,14 +130,18 @@ def test_confirm_payment_then_receipt(client, staff, journal):
 
     assert confirm.status_code == 200
     assert confirm.json["sale"]["payment_confirmed"] is True
+
+    # The receipt is a downloadable PDF with the correct sale details
     assert receipt.status_code == 200
-    assert receipt.json["receipt"] == {
-        "sale_id": sale["id"],
-        "journal_name": "Social and Economic Studies",
-        "quantity": 2,
-        "sale_amount": 20.0,
-        "date_sold": "2026-11-18",
-    }
+    assert receipt.mimetype == "application/pdf"
+    assert f"receipt-{sale['id']}.pdf" in receipt.headers["Content-Disposition"]
+    assert "attachment" in receipt.headers["Content-Disposition"]
+    assert receipt.data.startswith(b"%PDF")
+    assert receipt.data.rstrip().endswith(b"%%EOF")
+    assert b"/Count 1" in receipt.data  # one page
+    for text in [str(sale["id"]), "Social and Economic Studies", "2",
+                 "$20.00", "2026-11-18", "Payment received"]:
+        assert text.encode() in receipt.data
 
 
 def test_receipt_before_payment_rejected(client, staff, journal):
@@ -147,6 +151,19 @@ def test_receipt_before_payment_rejected(client, staff, journal):
 
     assert response.status_code == 409
     assert "receipt" not in response.json
+
+
+def test_receipt_for_user_who_does_not_exist_rejected(client, staff, journal):
+    sale = client.post("/sales", json=sale_data(journal), headers=staff).json["sale"]
+    client.post(f"/sales/{sale['id']}/confirm-payment", headers=staff)
+    token = create_access_token(identity="999999")
+
+    response = client.get(
+        f"/sales/{sale['id']}/receipt", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 403
+    assert not response.data.startswith(b"%PDF")
 
 
 def test_unknown_sale_returns_404(client, staff):
