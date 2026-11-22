@@ -8,15 +8,17 @@ import unittest
 from openpyxl import load_workbook
 
 try:
-    # Normal repository location: app/modules/reports.py
-    from app.modules.reports import (
+    from app.modules.report_generation import (
         NO_DATA_MESSAGE,
         export_report_to_excel,
         generate_report,
     )
 except ModuleNotFoundError:
-    # Allows this standalone copy to be tested before it is added to the repo.
-    from reports import NO_DATA_MESSAGE, export_report_to_excel, generate_report
+    from report_generation import (
+        NO_DATA_MESSAGE,
+        export_report_to_excel,
+        generate_report,
+    )
 
 
 ADMIN = "Administrator"
@@ -30,15 +32,15 @@ class ReportTests(unittest.TestCase):
         visits = [
             {
                 "visitor_id": "V-001",
-                "visitor_name": "Maya Brown",
-                "visitor_type": "Undergraduate",
-                "visit_date": "2026-11-02",
+                "name": "Maya Brown",
+                "type": "Undergraduate",
+                "check_in": "2026-11-02",
             },
             {
                 "visitor_id": "V-001",
-                "visitor_name": "Maya Brown",
-                "visitor_type": "Undergraduate",
-                "visit_date": "2026-11-08",
+                "name": "Maya Brown",
+                "type": "Undergraduate",
+                "check_in": "2026-11-08",
             },
         ]
 
@@ -47,7 +49,7 @@ class ReportTests(unittest.TestCase):
         )
 
         self.assertEqual(report["report_type"], "visitor")
-        self.assertEqual(report["records"][0]["visitor_name"], "Maya Brown")
+        self.assertEqual(report["records"][0]["name"], "Maya Brown")
         self.assertEqual(report["records"][0]["visit_frequency"], 2)
         self.assertEqual(
             report["records"][0]["visit_dates"],
@@ -58,10 +60,10 @@ class ReportTests(unittest.TestCase):
     def test_02_reservation_report(self):
         reservations = [
             {
-                "reservation_id": "RS-001",
-                "visitor": "Maya Brown",
-                "resource": "Seminar Room 1",
-                "reservation_date": "2026-11-10",
+                "id": "RS-001",
+                "visitor_id": "Maya Brown",
+                "resource_id": "Seminar Room 1",
+                "request_date": "2026-11-10",
                 "status": "Approved",
             }
         ]
@@ -70,18 +72,18 @@ class ReportTests(unittest.TestCase):
             "reservation", reservations, START_DATE, END_DATE, ADMIN
         )
 
-        self.assertEqual(report["records"][0]["resource"], "Seminar Room 1")
+        self.assertEqual(report["records"][0]["resource_id"], "Seminar Room 1")
         self.assertEqual(report["records"][0]["status"], "Approved")
 
     # TC-3.03: Journal-sales report generated successfully.
     def test_03_journal_sales_report(self):
         sales = [
             {
-                "sale_id": "S-001",
-                "journal": "Social and Economic Studies",
+                "id": "S-001",
+                "journal_id": "Social and Economic Studies",
                 "quantity": 2,
-                "sale_date": "2026-11-12",
-                "total_amount": 5000.00,
+                "date_sold": "2026-11-12",
+                "sale_amount": 5000.00,
             }
         ]
 
@@ -90,25 +92,25 @@ class ReportTests(unittest.TestCase):
         )
 
         self.assertEqual(report["records"][0]["quantity"], 2)
-        self.assertEqual(report["records"][0]["total_amount"], 5000.00)
+        self.assertEqual(report["records"][0]["sale_amount"], 5000.00)
 
     # TC-3.04: Fine report generated successfully.
     def test_04_fines_report(self):
         fines = [
             {
-                "fine_id": "F-001",
-                "visitor": "Maya Brown",
-                "fine_type": "Overdue",
+                "id": "F-001",
+                "visitor_id": "Maya Brown",
+                "reason": "Overdue",
                 "amount": 150.00,
-                "resource": "Caribbean Development",
+                "resource_id": "Caribbean Development",
                 "date_issued": "2026-11-15",
-                "payment_status": "Unpaid",
+                "status": "Unpaid",
             }
         ]
 
         report = generate_report("fines", fines, START_DATE, END_DATE, ADMIN)
 
-        self.assertEqual(report["records"][0]["fine_type"], "Overdue")
+        self.assertEqual(report["records"][0]["reason"], "Overdue")
         self.assertEqual(report["records"][0]["amount"], 150.00)
 
     # TC-3.05: A non-Administrator is denied access.
@@ -128,9 +130,9 @@ class ReportTests(unittest.TestCase):
         visits = [
             {
                 "visitor_id": "V-001",
-                "visitor_name": "Maya Brown",
-                "visitor_type": "Undergraduate",
-                "visit_date": "2026-10-15",
+                "name": "Maya Brown",
+                "type": "Undergraduate",
+                "check_in": "2026-10-15",
             }
         ]
 
@@ -155,10 +157,10 @@ class ReportTests(unittest.TestCase):
     def test_10_stored_records_are_not_changed(self):
         reservations = [
             {
-                "reservation_id": "RS-002",
-                "visitor": "Daniel King",
-                "resource": "Meeting Room 2",
-                "reservation_date": "2026-11-11",
+                "id": "RS-002",
+                "visitor_id": "Daniel King",
+                "resource_id": "Meeting Room 2",
+                "request_date": "2026-11-11",
                 "status": "Pending",
             }
         ]
@@ -169,7 +171,7 @@ class ReportTests(unittest.TestCase):
         )
 
         self.assertEqual(reservations, original)
-        self.assertEqual(report["records"][0]["reservation_id"], "RS-002")
+        self.assertEqual(report["records"][0]["id"], "RS-002")
         self.assertEqual(report["records"][0]["status"], "Pending")
 
     # TC-3.11: A single-day visitor range includes that day's visits.
@@ -177,15 +179,15 @@ class ReportTests(unittest.TestCase):
         visits = [
             {
                 "visitor_id": "V-002",
-                "visitor_name": "Daniel King",
-                "visitor_type": "Postgraduate",
-                "visit_date": "2026-11-14",
+                "name": "Daniel King",
+                "type": "Postgraduate",
+                "check_in": "2026-11-14",
             },
             {
                 "visitor_id": "V-002",
-                "visitor_name": "Daniel King",
-                "visitor_type": "Postgraduate",
-                "visit_date": "2026-11-15",
+                "name": "Daniel King",
+                "type": "Postgraduate",
+                "check_in": "2026-11-15",
             },
         ]
 
@@ -201,15 +203,15 @@ class ReportTests(unittest.TestCase):
         visits = [
             {
                 "visitor_id": "V-003",
-                "visitor_name": "Leah Grant",
-                "visitor_type": "Undergraduate",
-                "visit_date": "2026-11-03",
+                "name": "Leah Grant",
+                "type": "Undergraduate",
+                "check_in": "2026-11-03",
             },
             {
                 "visitor_id": "V-004",
-                "visitor_name": "Owen Clarke",
-                "visitor_type": "Outside Personnel",
-                "visit_date": "2026-11-04",
+                "name": "Owen Clarke",
+                "type": "Outside Personnel",
+                "check_in": "2026-11-04",
             },
         ]
 
@@ -217,22 +219,22 @@ class ReportTests(unittest.TestCase):
             "visitor", visits, START_DATE, END_DATE, ADMIN
         )
 
-        categories = {record["visitor_type"] for record in report["records"]}
+        categories = {record["type"] for record in report["records"]}
         self.assertEqual(categories, {"Undergraduate", "Outside Personnel"})
 
     # TC-3.13: Reservation statuses are reported separately.
     def test_13_reservation_statuses(self):
         reservations = [
             {
-                "visitor": "Maya Brown",
-                "resource": "Seminar Room 1",
-                "reservation_date": "2026-11-10",
+                "visitor_id": "Maya Brown",
+                "resource_id": "Seminar Room 1",
+                "request_date": "2026-11-10",
                 "status": "Approved",
             },
             {
-                "visitor": "Daniel King",
-                "resource": "Meeting Room 2",
-                "reservation_date": "2026-11-11",
+                "visitor_id": "Daniel King",
+                "resource_id": "Meeting Room 2",
+                "request_date": "2026-11-11",
                 "status": "Rejected",
             },
         ]
@@ -250,15 +252,15 @@ class ReportTests(unittest.TestCase):
     def test_14_reservation_resource_types(self):
         reservations = [
             {
-                "visitor": "Maya Brown",
-                "resource": "Seminar Room 1",
-                "reservation_date": "2026-11-10",
+                "visitor_id": "Maya Brown",
+                "resource_id": "Seminar Room 1",
+                "request_date": "2026-11-10",
                 "status": "Approved",
             },
             {
-                "visitor": "Daniel King",
-                "resource": "Projector 1",
-                "reservation_date": "2026-11-11",
+                "visitor_id": "Daniel King",
+                "resource_id": "Projector 1",
+                "request_date": "2026-11-11",
                 "status": "Approved",
             },
         ]
@@ -268,7 +270,7 @@ class ReportTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            {record["resource"] for record in report["records"]},
+            {record["resource_id"] for record in report["records"]},
             {"Seminar Room 1", "Projector 1"},
         )
 
@@ -276,16 +278,16 @@ class ReportTests(unittest.TestCase):
     def test_15_multiple_sales_same_journal(self):
         sales = [
             {
-                "journal": "Social and Economic Studies",
+                "journal_id": "Social and Economic Studies",
                 "quantity": 1,
-                "sale_date": "2026-11-12",
-                "total_amount": 2500.00,
+                "date_sold": "2026-11-12",
+                "sale_amount": 2500.00,
             },
             {
-                "journal": "Social and Economic Studies",
+                "journal_id": "Social and Economic Studies",
                 "quantity": 3,
-                "sale_date": "2026-11-13",
-                "total_amount": 7500.00,
+                "date_sold": "2026-11-13",
+                "sale_amount": 7500.00,
             },
         ]
 
@@ -300,16 +302,16 @@ class ReportTests(unittest.TestCase):
     def test_16_different_journals_same_date(self):
         sales = [
             {
-                "journal": "Journal A",
+                "journal_id": "Journal A",
                 "quantity": 1,
-                "sale_date": "2026-11-12",
-                "total_amount": 2000.00,
+                "date_sold": "2026-11-12",
+                "sale_amount": 2000.00,
             },
             {
-                "journal": "Journal B",
+                "journal_id": "Journal B",
                 "quantity": 2,
-                "sale_date": "2026-11-12",
-                "total_amount": 4000.00,
+                "date_sold": "2026-11-12",
+                "sale_amount": 4000.00,
             },
         ]
 
@@ -318,7 +320,7 @@ class ReportTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            {record["journal"] for record in report["records"]},
+            {record["journal_id"] for record in report["records"]},
             {"Journal A", "Journal B"},
         )
 
@@ -326,27 +328,27 @@ class ReportTests(unittest.TestCase):
     def test_17_fine_types(self):
         fines = [
             {
-                "visitor": "Maya Brown",
-                "fine_type": "Overdue",
+                "visitor_id": "Maya Brown",
+                "reason": "Overdue",
                 "amount": 150.00,
-                "resource": "Book A",
+                "resource_id": "Book A",
                 "date_issued": "2026-11-15",
-                "payment_status": "Unpaid",
+                "status": "Unpaid",
             },
             {
-                "visitor": "Daniel King",
-                "fine_type": "Damaged",
+                "visitor_id": "Daniel King",
+                "reason": "Damaged",
                 "amount": 1200.00,
-                "resource": "Book B",
+                "resource_id": "Book B",
                 "date_issued": "2026-11-16",
-                "payment_status": "Unpaid",
+                "status": "Unpaid",
             },
         ]
 
         report = generate_report("fines", fines, START_DATE, END_DATE, ADMIN)
 
         self.assertEqual(
-            {record["fine_type"] for record in report["records"]},
+            {record["reason"] for record in report["records"]},
             {"Overdue", "Damaged"},
         )
 
@@ -354,27 +356,27 @@ class ReportTests(unittest.TestCase):
     def test_18_fine_payment_statuses(self):
         fines = [
             {
-                "visitor": "Maya Brown",
-                "fine_type": "Overdue",
+                "visitor_id": "Maya Brown",
+                "reason": "Overdue",
                 "amount": 150.00,
-                "resource": "Book A",
+                "resource_id": "Book A",
                 "date_issued": "2026-11-15",
-                "payment_status": "Paid",
+                "status": "Paid",
             },
             {
-                "visitor": "Daniel King",
-                "fine_type": "Damaged",
+                "visitor_id": "Daniel King",
+                "reason": "Damaged",
                 "amount": 1200.00,
-                "resource": "Book B",
+                "resource_id": "Book B",
                 "date_issued": "2026-11-16",
-                "payment_status": "Unpaid",
+                "status": "Unpaid",
             },
         ]
 
         report = generate_report("fines", fines, START_DATE, END_DATE, ADMIN)
 
         self.assertEqual(
-            {record["payment_status"] for record in report["records"]},
+            {record["status"] for record in report["records"]},
             {"Paid", "Unpaid"},
         )
 
@@ -383,15 +385,15 @@ class ReportTests(unittest.TestCase):
         visits = [
             {
                 "visitor_id": "V-001",
-                "visitor_name": "Maya Brown",
-                "visitor_type": "Undergraduate",
-                "visit_date": "2026-11-02",
+                "name": "Maya Brown",
+                "type": "Undergraduate",
+                "check_in": "2026-11-02",
             },
             {
                 "visitor_id": "V-002",
-                "visitor_name": "Omar Lewis",
-                "visitor_type": "Outside Personnel",
-                "visit_date": "2026-11-03",
+                "name": "Omar Lewis",
+                "type": "Outside Personnel",
+                "check_in": "2026-11-03",
             },
         ]
         report = generate_report(

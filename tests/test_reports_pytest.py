@@ -1,4 +1,4 @@
-"""Pytest verification of reports.py using provisional mock records."""
+"""Pytest verification of the report generation business logic."""
 
 from copy import deepcopy
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
-from app.modules.reports import (
+from app.modules.report_generation import (
     NO_DATA_MESSAGE,
     export_report_to_excel,
     generate_report,
@@ -72,7 +72,7 @@ def test_visitor_frequency_and_categories_are_reported(mock_records):
     maya = next(
         record for record in report["records"] if record["visitor_id"] == "V-001"
     )
-    categories = {record["visitor_type"] for record in report["records"]}
+    categories = {record["type"] for record in report["records"]}
 
     assert maya["visit_frequency"] == 2
     assert categories == {

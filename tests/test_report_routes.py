@@ -1,13 +1,14 @@
-"""Integration tests for the proposed administrative reporting routes."""
+"""Integration tests for the administrative reporting endpoints."""
 
 from io import BytesIO
 import unittest
+from unittest.mock import patch
 
-from openpyxl import load_workbook
 from flask import Flask
 from flask_jwt_extended import JWTManager, create_access_token
+from openpyxl import load_workbook
 
-from app.modules.report_routes import reports_bp
+from app.routes.reports import reports_bp
 
 
 class ReportRouteTests(unittest.TestCase):
@@ -16,9 +17,9 @@ class ReportRouteTests(unittest.TestCase):
             "visitor": [
                 {
                     "visitor_id": "V-001",
-                    "visitor_name": "Maya Brown",
-                    "visitor_type": "Undergraduate",
-                    "visit_date": "2026-11-02",
+                    "name": "Maya Brown",
+                    "type": "Undergraduate",
+                    "check_in": "2026-11-02T09:30:00+00:00",
                 }
             ],
             "reservation": [],
@@ -26,11 +27,17 @@ class ReportRouteTests(unittest.TestCase):
             "fines": [],
         }
 
+        self.record_patch = patch(
+            "app.routes.reports.get_report_records",
+            side_effect=lambda report_type: self.records[report_type],
+        )
+        self.record_patch.start()
+        self.addCleanup(self.record_patch.stop)
+
         self.app = Flask(__name__)
         self.app.config.update(
             TESTING=True,
             JWT_SECRET_KEY="report-route-test-secret-at-least-32-bytes",
-            REPORT_RECORD_PROVIDER=lambda report_type: self.records[report_type],
         )
         JWTManager(self.app)
         self.app.register_blueprint(reports_bp)
@@ -46,22 +53,17 @@ class ReportRouteTests(unittest.TestCase):
                 additional_claims={"role": "Staff"},
             )
 
-    def _headers(self, token):
+    @staticmethod
+    def _headers(token):
         return {"Authorization": f"Bearer {token}"}
 
-    def _visitor_request(self):
+    @staticmethod
+    def _visitor_request():
         return {
             "report_type": "visitor",
             "start_date": "2026-11-01",
             "end_date": "2026-11-07",
         }
-
-    def test_administrator_can_open_reports_page(self):
-        response = self.client.get(
-            "/reports/", headers=self._headers(self.admin_token)
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b"Administrative Reports", response.data)
 
     def test_administrator_can_generate_visitor_report(self):
         response = self.client.post(
@@ -72,7 +74,7 @@ class ReportRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         report = response.get_json()
         self.assertEqual(report["report_type"], "visitor")
-        self.assertEqual(report["records"][0]["visitor_name"], "Maya Brown")
+        self.assertEqual(report["records"][0]["name"], "Maya Brown")
 
     def test_non_administrator_is_denied(self):
         response = self.client.post(
@@ -112,6 +114,17 @@ class ReportRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("required", response.get_json()["error"])
 
+    def test_invalid_report_type_is_rejected(self):
+        request_data = self._visitor_request()
+        request_data["report_type"] = "unknown"
+        response = self.client.post(
+            "/reports/generate",
+            headers=self._headers(self.admin_token),
+            json=request_data,
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("valid report type", response.get_json()["error"])
+
     def test_no_data_message_is_returned(self):
         request_data = self._visitor_request()
         request_data["report_type"] = "fines"
@@ -130,19 +143,14 @@ class ReportRouteTests(unittest.TestCase):
             json=self._visitor_request(),
         )
         self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            "application/vnd.openxmlformats-officedocument",
-            response.content_type,
-        )
         self.assertIn("spreadsheetml.sheet", response.content_type)
-        self.assertIn("visitor_report.xlsx", response.headers["Content-Disposition"])
+        self.assertIn(
+            "visitor_report.xlsx", response.headers["Content-Disposition"]
+        )
 
         worksheet = load_workbook(BytesIO(response.data)).active
         self.assertEqual(worksheet["A1"].value, "Visitor Report")
-        self.assertEqual(
-            worksheet["B5"].value,
-            "Maya Brown",
-        )
+        self.assertEqual(worksheet["B5"].value, "Maya Brown")
 
 
 if __name__ == "__main__":
