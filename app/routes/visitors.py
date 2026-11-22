@@ -84,7 +84,6 @@ def check_in_visitor():
             _optional_visitor_text(data, "id_number"),
             _required_visitor_text(data, "purpose"),
             visitor_id=_visitor_record_id(data),
-            phone_number=_optional_visitor_text(data, "phone_number"),
         )
     except VisitorManagementError as error:
         return _error_response(error)
@@ -101,7 +100,6 @@ def check_out_visitor():
         updated_visit = manage_check_out(
             _optional_visitor_text(data, "id_number"),
             visitor_id=_visitor_record_id(data),
-            phone_number=_optional_visitor_text(data, "phone_number"),
         )
     except VisitorManagementError as error:
         return _error_response(error)
