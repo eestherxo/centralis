@@ -57,6 +57,23 @@ def _find_visitor_by_record_id(visitor_id: int) -> dict[str, Any] | None:
     )
 
 
+def _find_visitor_by_phone_number(phone_number: str) -> dict[str, Any] | None:
+    normalized_phone_number = phone_number.strip().casefold()
+    matches = [
+        visitor
+        for visitor in data_access.get_all_records("visitor")
+        if isinstance(visitor.get("phone_number"), str)
+        and visitor["phone_number"].strip().casefold() == normalized_phone_number
+    ]
+    if len(matches) > 1:
+        raise VisitorManagementError(
+            "Multiple visitors share this phone number. Use an ID number instead.",
+            409,
+            {"phone_number": "Use an ID number to identify your visitor."},
+        )
+    return matches[0] if matches else None
+
+
 def _active_visit(visitor_id: int) -> dict[str, Any] | None:
     return next(
         (
@@ -139,22 +156,28 @@ def register_visitor(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
 
 
 def _find_visitor_for_visit(
-    id_number: str | None, visitor_id: int | None
+    id_number: str | None,
+    visitor_id: int | None,
+    phone_number: str | None,
 ) -> dict[str, Any] | None:
     if visitor_id is not None:
         return _find_visitor_by_record_id(visitor_id)
-    return _find_visitor(id_number)
+    if isinstance(id_number, str) and id_number.strip():
+        return _find_visitor(id_number)
+    if isinstance(phone_number, str) and phone_number.strip():
+        return _find_visitor_by_phone_number(phone_number)
+    return None
 
 
 def _validate_visitor_identifier(
-    id_number: str | None, visitor_id: int | None
+    id_number: str | None,
+    visitor_id: int | None,
+    phone_number: str | None,
 ) -> None:
     if id_number is not None and not isinstance(id_number, str):
         raise VisitorManagementError(
             "Invalid visitor details.", 400, {"id_number": "Enter a valid ID number."}
         )
-    if id_number is not None and id_number.strip():
-        return
     if visitor_id is not None:
         if (
             isinstance(visitor_id, int)
@@ -167,19 +190,32 @@ def _validate_visitor_identifier(
             400,
             {"visitor_id": "Enter a valid visitor ID."},
         )
+    if phone_number is not None and not isinstance(phone_number, str):
+        raise VisitorManagementError(
+            "Invalid visitor details.",
+            400,
+            {"phone_number": "Enter a valid phone number."},
+        )
+    if id_number is not None and id_number.strip():
+        return
+    if phone_number is not None and phone_number.strip():
+        return
     raise VisitorManagementError(
         "Invalid visitor details.",
         400,
-        {"id_number": "Provide an ID number or visitor ID."},
+        {"id_number": "Provide an ID number, phone number, or visitor ID."},
     )
 
 
 def check_in_visitor(
-    id_number: str | None, purpose: str, visitor_id: int | None = None
+    id_number: str | None,
+    purpose: str,
+    visitor_id: int | None = None,
+    phone_number: str | None = None,
 ) -> dict[str, Any]:
     _validate_required_fields({"purpose": purpose}, ("purpose",))
-    _validate_visitor_identifier(id_number, visitor_id)
-    visitor = _find_visitor_for_visit(id_number, visitor_id)
+    _validate_visitor_identifier(id_number, visitor_id, phone_number)
+    visitor = _find_visitor_for_visit(id_number, visitor_id, phone_number)
     if visitor is None:
         raise VisitorManagementError(
             "Visitor is not registered. Please register first.", 404
@@ -201,10 +237,12 @@ def check_in_visitor(
 
 
 def check_out_visitor(
-    id_number: str | None, visitor_id: int | None = None
+    id_number: str | None,
+    visitor_id: int | None = None,
+    phone_number: str | None = None,
 ) -> dict[str, Any]:
-    _validate_visitor_identifier(id_number, visitor_id)
-    visitor = _find_visitor_for_visit(id_number, visitor_id)
+    _validate_visitor_identifier(id_number, visitor_id, phone_number)
+    visitor = _find_visitor_for_visit(id_number, visitor_id, phone_number)
     if visitor is None:
         raise VisitorManagementError("Visitor is not registered.", 404)
 

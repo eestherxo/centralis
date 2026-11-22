@@ -168,3 +168,51 @@ def test_external_visitor_can_check_in_and_out_by_visitor_id(client):
     assert check_out.status_code == 200
     assert check_in.status_code == 201
     assert check_in.get_json()["visit"]["visitor_id"] == visitor_id
+
+
+def test_visitor_can_check_in_and_out_by_phone_number(client):
+    registration = client.post(
+        "/visitors/register",
+        json=visitor_data(type="external", id_number="", faculty=""),
+    )
+    visitor_id = registration.get_json()["visitor"]["id"]
+
+    check_out = client.post(
+        "/visitors/check-out", json={"phone_number": "555-0123"}
+    )
+    check_in = client.post(
+        "/visitors/check-in",
+        json={"phone_number": "555-0123", "purpose": "Consultation"},
+    )
+    check_out_again = client.post(
+        "/visitors/check-out", json={"phone_number": "555-0123"}
+    )
+
+    assert check_out.status_code == 200
+    assert check_out.get_json()["visit"]["visitor_id"] == visitor_id
+    assert check_in.status_code == 201
+    assert check_in.get_json()["visit"]["visitor_id"] == visitor_id
+    assert check_out_again.status_code == 200
+    assert datetime.fromisoformat(check_out_again.get_json()["visit"]["check_out"])
+
+
+def test_phone_number_lookup_rejects_ambiguous_visitors(client):
+    client.post(
+        "/visitors/register",
+        json=visitor_data(id_number="ID-123"),
+    )
+    client.post(
+        "/visitors/register",
+        json=visitor_data(id_number="ID-456"),
+    )
+
+    response = client.post(
+        "/visitors/check-out", json={"phone_number": "555-0123"}
+    )
+
+    assert response.status_code == 409
+    assert "phone_number" in response.get_json()["fields"]
+    assert all(
+        visit["check_out"] is None
+        for visit in data_access.get_all_records("visit")
+    )
