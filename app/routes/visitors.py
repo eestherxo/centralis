@@ -83,7 +83,8 @@ def check_in_visitor():
         visit = manage_check_in(
             _optional_visitor_text(data, "id_number"),
             _required_visitor_text(data, "purpose"),
-            _visitor_record_id(data),
+            visitor_id=_visitor_record_id(data),
+            phone_number=_optional_visitor_text(data, "phone_number"),
         )
     except VisitorManagementError as error:
         return _error_response(error)
@@ -99,7 +100,8 @@ def check_out_visitor():
         data = _json_body()
         updated_visit = manage_check_out(
             _optional_visitor_text(data, "id_number"),
-            _visitor_record_id(data),
+            visitor_id=_visitor_record_id(data),
+            phone_number=_optional_visitor_text(data, "phone_number"),
         )
     except VisitorManagementError as error:
         return _error_response(error)
