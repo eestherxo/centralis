@@ -46,6 +46,28 @@ class VisitorType(str, Enum):
     POSTGRAD = "postgraduate"
     EXTERNAL = "external"
 
+class Role(str, Enum):
+    ADMIN = "admin"
+    STAFF = "staff"
+
+
+@dataclass
+class User:
+    id: int | None = field(default=None, kw_only=True)
+    name: str
+    email: str
+    password: str = field(repr=False)
+    role: Role = field(default=Role.STAFF, kw_only=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "password": self.password,
+            "role": self.role.value,
+        }
+
 
 @dataclass
 class Visitor:
