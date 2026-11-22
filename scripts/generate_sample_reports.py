@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from app.modules.reports import generate_report, export_report_to_word
+from app.modules.reports import generate_report, export_report_to_excel
 from tests.mock_data import MOCK_REPORT_DATA
 
 
-output_folder = Path("sample_word_reports")
+output_folder = Path("sample_excel_reports")
 output_folder.mkdir(exist_ok=True)
 
 for report_type in [
@@ -21,9 +21,9 @@ for report_type in [
         "Administrator",
     )
 
-    output_file = export_report_to_word(
+    output_file = export_report_to_excel(
         report,
-        output_folder / f"{report_type}_report.docx",
+        output_folder / f"{report_type}_report.xlsx",
     )
 
     print(f"Created: {output_file.resolve()}")

@@ -88,7 +88,7 @@
         <div class="actions">
             <button type="submit">Generate report</button>
             <button type="button" class="secondary" id="export-button">
-                Export to Word
+                Export to Excel
             </button>
         </div>
     </form>
@@ -164,7 +164,7 @@
     });
 
     exportButton.addEventListener("click", async () => {
-        showMessage("Preparing Word document...");
+        showMessage("Preparing Excel workbook...");
         const response = await fetch("{{ url_for('reports.export_report_route') }}", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
@@ -180,10 +180,10 @@
         const blob = await response.blob();
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `${requestData().report_type}_report.docx`;
+        link.download = `${requestData().report_type}_report.xlsx`;
         link.click();
         URL.revokeObjectURL(link.href);
-        showMessage("Word document downloaded.");
+        showMessage("Excel workbook downloaded.");
     });
 </script>
 </body>

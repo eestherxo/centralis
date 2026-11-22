@@ -3,7 +3,7 @@
 from io import BytesIO
 import unittest
 
-from docx import Document
+from openpyxl import load_workbook
 from flask import Flask
 from flask_jwt_extended import JWTManager, create_access_token
 
@@ -123,7 +123,7 @@ class ReportRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["message"], "No data available")
 
-    def test_administrator_can_export_word_report(self):
+    def test_administrator_can_export_excel_report(self):
         response = self.client.post(
             "/reports/export",
             headers=self._headers(self.admin_token),
@@ -134,12 +134,13 @@ class ReportRouteTests(unittest.TestCase):
             "application/vnd.openxmlformats-officedocument",
             response.content_type,
         )
-        self.assertIn("visitor_report.docx", response.headers["Content-Disposition"])
+        self.assertIn("spreadsheetml.sheet", response.content_type)
+        self.assertIn("visitor_report.xlsx", response.headers["Content-Disposition"])
 
-        exported_document = Document(BytesIO(response.data))
-        self.assertIn("Visitor Report", exported_document.paragraphs[0].text)
+        worksheet = load_workbook(BytesIO(response.data)).active
+        self.assertEqual(worksheet["A1"].value, "Visitor Report")
         self.assertEqual(
-            exported_document.tables[0].rows[1].cells[1].text,
+            worksheet["B5"].value,
             "Maya Brown",
         )
 

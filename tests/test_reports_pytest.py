@@ -4,11 +4,11 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from docx import Document
+from openpyxl import load_workbook
 
 from app.modules.reports import (
     NO_DATA_MESSAGE,
-    export_report_to_word,
+    export_report_to_excel,
     generate_report,
 )
 from tests.mock_data import MOCK_REPORT_DATA
@@ -135,7 +135,7 @@ def test_missing_required_record_field_is_reported(mock_records):
     "report_type",
     ["visitor", "reservation", "journal_sales", "fines"],
 )
-def test_each_supported_report_can_be_exported_to_word(
+def test_each_supported_report_can_be_exported_to_excel(
     mock_records, report_type, tmp_path: Path
 ):
     report = generate_report(
@@ -145,12 +145,12 @@ def test_each_supported_report_can_be_exported_to_word(
         END_DATE,
         ADMIN,
     )
-    output_file = export_report_to_word(
-        report, tmp_path / f"{report_type}_report.docx"
+    output_file = export_report_to_excel(
+        report, tmp_path / f"{report_type}_report.xlsx"
     )
 
-    document = Document(output_file)
+    worksheet = load_workbook(output_file).active
     assert output_file.exists()
-    assert output_file.suffix == ".docx"
-    assert document.tables
-    assert len(document.tables[0].rows) == len(report["records"]) + 1
+    assert output_file.suffix == ".xlsx"
+    assert worksheet["A1"].value.endswith("Report")
+    assert worksheet.max_row == len(report["records"]) + 4

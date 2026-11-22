@@ -22,7 +22,7 @@ from flask import (
 )
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
-from .reports import REPORT_GENERATORS, export_report_to_word, generate_report
+from .reports import REPORT_GENERATORS, export_report_to_excel, generate_report
 
 
 reports_bp = Blueprint(
@@ -49,12 +49,20 @@ def _role_from_token() -> str | None:
     identity = get_jwt_identity()
     if isinstance(identity, dict) and identity.get("role"):
         return str(identity["role"])
+
+    # The merged application stores only the user ID in the JWT identity.
+    # Look up that user so the reporting routes work with the shared login.
+    from .authentication import get_user
+
+    user = get_user(identity)
+    if user and user.get("role"):
+        return str(user["role"])
     return None
 
 
 def _administrator_access_error():
     role = _role_from_token()
-    if not role or role.strip().lower() != "administrator":
+    if not role or role.strip().lower() not in {"admin", "administrator"}:
         return jsonify(
             {"error": "Only an Administrator may access reports"}
         ), 403
@@ -136,8 +144,8 @@ def export_report_route():
         return jsonify({"error": str(error)}), 503
 
     with TemporaryDirectory() as directory:
-        report_name = f"{report['report_type']}_report.docx"
-        report_path = export_report_to_word(
+        report_name = f"{report['report_type']}_report.xlsx"
+        report_path = export_report_to_excel(
             report, f"{directory}/{report_name}"
         )
         report_bytes = BytesIO(report_path.read_bytes())
@@ -149,6 +157,6 @@ def export_report_route():
         download_name=report_name,
         mimetype=(
             "application/vnd.openxmlformats-officedocument."
-            "wordprocessingml.document"
+            "spreadsheetml.sheet"
         ),
     )

@@ -12,10 +12,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from docx import Document
-from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.oxml.ns import qn
-from docx.shared import Pt, RGBColor
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 
 NO_DATA_MESSAGE = "No data available"
@@ -271,64 +270,85 @@ def generate_report(
     return REPORT_GENERATORS[report_type](records, start_date, end_date)
 
 
-def _word_cell_value(value: Any) -> str:
-    """Convert a report value to readable text for a Word table cell."""
+def _excel_cell_value(value: Any) -> Any:
+    """Convert a report value to a value supported by an Excel cell."""
     if value is None:
         return ""
     if isinstance(value, (list, tuple, set)):
         return ", ".join(str(item) for item in value)
-    return str(value)
+    return value
 
 
-def export_report_to_word(
+def export_report_to_excel(
     report: dict[str, Any], output_path: str | Path
 ) -> Path:
-    """Export a generated report to a Microsoft Word ``.docx`` file."""
+    """Export a generated report to a Microsoft Excel ``.xlsx`` file."""
     report_type = report.get("report_type")
     if report_type not in REPORT_EXPORT_COLUMNS:
-        raise ValueError("The report type cannot be exported to Microsoft Word")
+        raise ValueError("The report type cannot be exported to Microsoft Excel")
 
     if "start_date" not in report or "end_date" not in report:
         raise ValueError("The report must include a start date and an end date")
 
     output_file = Path(output_path)
-    if output_file.suffix.lower() != ".docx":
-        output_file = output_file.with_suffix(".docx")
+    if output_file.suffix.lower() != ".xlsx":
+        output_file = output_file.with_suffix(".xlsx")
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     title, columns = REPORT_EXPORT_COLUMNS[report_type]
-    document = Document()
-    title_style = document.styles["Title"]
-    title_style.font.size = Pt(24)
-    title_style.font.bold = True
-    title_style.font.color.rgb = RGBColor(0, 0, 0)
-    title_style_properties = title_style.element.get_or_add_pPr()
-    title_border = title_style_properties.find(qn("w:pBdr"))
-    if title_border is not None:
-        title_style_properties.remove(title_border)
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = title[:31]
 
-    title_paragraph = document.add_paragraph(title, style="Title")
-    title_paragraph.paragraph_format.space_before = Pt(24)
-    title_paragraph.paragraph_format.space_after = Pt(12)
-    document.add_paragraph(
+    last_column = get_column_letter(len(columns))
+    worksheet.merge_cells(f"A1:{last_column}1")
+    worksheet["A1"] = title
+    worksheet["A1"].font = Font(size=18, bold=True, color="FFFFFF")
+    worksheet["A1"].fill = PatternFill("solid", fgColor="123F68")
+    worksheet["A1"].alignment = Alignment(horizontal="center")
+
+    worksheet.merge_cells(f"A2:{last_column}2")
+    worksheet["A2"] = (
         f"Date range: {report['start_date']} to {report['end_date']}"
     )
+    worksheet["A2"].font = Font(italic=True)
+    worksheet["A2"].alignment = Alignment(horizontal="center")
 
     records = report.get("records", [])
     if not records:
-        document.add_paragraph(report.get("message", NO_DATA_MESSAGE))
+        worksheet.merge_cells(f"A4:{last_column}4")
+        worksheet["A4"] = report.get("message", NO_DATA_MESSAGE)
+        worksheet["A4"].alignment = Alignment(horizontal="center")
     else:
-        table = document.add_table(rows=1, cols=len(columns))
-        table.style = "Table Grid"
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        for index, (_, heading) in enumerate(columns, start=1):
+            cell = worksheet.cell(row=4, column=index, value=heading)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill("solid", fgColor="155C94")
+            cell.alignment = Alignment(horizontal="center")
 
-        for index, (_, heading) in enumerate(columns):
-            table.rows[0].cells[index].text = heading
+        for row_index, record in enumerate(records, start=5):
+            for column_index, (field, _) in enumerate(columns, start=1):
+                cell = worksheet.cell(
+                    row=row_index,
+                    column=column_index,
+                    value=_excel_cell_value(record.get(field)),
+                )
+                if field in {"amount", "total_amount"}:
+                    cell.number_format = "#,##0.00"
 
-        for record in records:
-            cells = table.add_row().cells
-            for index, (field, _) in enumerate(columns):
-                cells[index].text = _word_cell_value(record.get(field))
+        worksheet.auto_filter.ref = f"A4:{last_column}{worksheet.max_row}"
+        worksheet.freeze_panes = "A5"
 
-    document.save(output_file)
+    for column_index, (_, heading) in enumerate(columns, start=1):
+        values = [heading]
+        values.extend(
+            _excel_cell_value(record.get(columns[column_index - 1][0]))
+            for record in records
+        )
+        longest = max(len(str(value)) for value in values)
+        worksheet.column_dimensions[get_column_letter(column_index)].width = min(
+            max(longest + 4, 14), 40
+        )
+
+    workbook.save(output_file)
     return output_file

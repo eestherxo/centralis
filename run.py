@@ -8,8 +8,10 @@ from flask_jwt_extended import JWTManager
 from app.routes.resources import inventory_bp
 from app.routes.visitors import visitors_bp
 from app.routes.auth import auth_bp
+from app.routes.reports import reports_bp
 from app.models import Role 
 from app.modules.authentication import create_user
+from app.modules.report_generation import get_report_records
 from app import data_access
 
 load_dotenv()
@@ -20,7 +22,8 @@ jwt_secret = os.getenv("JWT_SECRET_KEY")
 
 app.config.update(
     JWT_SECRET_KEY=jwt_secret,
-    JWT_ACCESS_TOKEN_EXPIRES=timedelta(minutes=60)
+    JWT_ACCESS_TOKEN_EXPIRES=timedelta(minutes=60),
+    REPORT_RECORD_PROVIDER=get_report_records,
 )
 
 JWTManager(app)
@@ -28,6 +31,7 @@ JWTManager(app)
 app.register_blueprint(inventory_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(visitors_bp)
+app.register_blueprint(reports_bp)
 
 
 

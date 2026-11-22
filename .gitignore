@@ -5,7 +5,7 @@ __pycache__/
 *.py[cod]
 
 # Generated reports
-sample_word_reports/
+sample_excel_reports/
 
 # Node.js / Vue
 node_modules/

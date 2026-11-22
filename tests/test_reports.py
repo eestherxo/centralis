@@ -5,18 +5,18 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from docx import Document
+from openpyxl import load_workbook
 
 try:
     # Normal repository location: app/modules/reports.py
     from app.modules.reports import (
         NO_DATA_MESSAGE,
-        export_report_to_word,
+        export_report_to_excel,
         generate_report,
     )
 except ModuleNotFoundError:
     # Allows this standalone copy to be tested before it is added to the repo.
-    from reports import NO_DATA_MESSAGE, export_report_to_word, generate_report
+    from reports import NO_DATA_MESSAGE, export_report_to_excel, generate_report
 
 
 ADMIN = "Administrator"
@@ -378,8 +378,8 @@ class ReportTests(unittest.TestCase):
             {"Paid", "Unpaid"},
         )
 
-    # TC-3.19: A generated report can be exported to Microsoft Word.
-    def test_19_export_report_to_word(self):
+    # TC-3.19: A generated report can be exported to Microsoft Excel.
+    def test_19_export_report_to_excel(self):
         visits = [
             {
                 "visitor_id": "V-001",
@@ -399,23 +399,20 @@ class ReportTests(unittest.TestCase):
         )
 
         with TemporaryDirectory() as directory:
-            requested_path = Path(directory) / "visitor_report.docx"
-            exported_path = export_report_to_word(report, requested_path)
+            requested_path = Path(directory) / "visitor_report.xlsx"
+            exported_path = export_report_to_excel(report, requested_path)
 
             self.assertTrue(exported_path.exists())
-            self.assertEqual(exported_path.suffix, ".docx")
+            self.assertEqual(exported_path.suffix, ".xlsx")
 
-            exported_document = Document(exported_path)
-            paragraph_text = "\n".join(
-                paragraph.text for paragraph in exported_document.paragraphs
-            )
-            self.assertIn("Visitor Report", paragraph_text)
-            self.assertIn(
-                f"Date range: {START_DATE} to {END_DATE}", paragraph_text
+            worksheet = load_workbook(exported_path).active
+            self.assertEqual(worksheet["A1"].value, "Visitor Report")
+            self.assertEqual(
+                worksheet["A2"].value,
+                f"Date range: {START_DATE} to {END_DATE}",
             )
 
-            table = exported_document.tables[0]
-            headings = [cell.text for cell in table.rows[0].cells]
+            headings = [cell.value for cell in worksheet[4]]
             self.assertEqual(
                 headings,
                 [
@@ -427,16 +424,16 @@ class ReportTests(unittest.TestCase):
                 ],
             )
 
-            exported_rows = [
-                [cell.text for cell in row.cells] for row in table.rows[1:]
-            ]
+            exported_rows = [list(row) for row in worksheet.iter_rows(
+                min_row=5, values_only=True
+            )]
             self.assertIn(
                 [
                     "V-001",
                     "Maya Brown",
                     "Undergraduate",
                     "2026-11-02",
-                    "1",
+                    1,
                 ],
                 exported_rows,
             )
@@ -446,7 +443,7 @@ class ReportTests(unittest.TestCase):
                     "Omar Lewis",
                     "Outside Personnel",
                     "2026-11-03",
-                    "1",
+                    1,
                 ],
                 exported_rows,
             )
