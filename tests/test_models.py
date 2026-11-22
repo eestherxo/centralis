@@ -244,4 +244,5 @@ def test_sale_model():
         "quantity": 2,
         "sale_amount": 17.0,
         "date_sold": date(2026, 11, 18),
+        "payment_confirmed": False,
     }

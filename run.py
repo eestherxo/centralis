@@ -9,6 +9,7 @@ from app.routes.resources import inventory_bp
 from app.routes.visitors import visitors_bp
 from app.routes.auth import auth_bp
 from app.routes.reports import reports_bp
+from app.routes.sales import sales_bp
 from app.models import Role 
 from app.modules.authentication import create_user
 from app.modules.report_generation import get_report_records
@@ -32,6 +33,7 @@ app.register_blueprint(inventory_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(visitors_bp)
 app.register_blueprint(reports_bp)
+app.register_blueprint(sales_bp)
 
 
 

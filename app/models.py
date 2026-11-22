@@ -271,7 +271,8 @@ class Sale:
     journal: int 
     quantity: int 
     sale_amount: float 
-    date_sold: date 
+    date_sold: date
+    payment_confirmed: bool = field(default=False, kw_only=True)
 
     def to_dict(self):
         return {
@@ -280,4 +281,5 @@ class Sale:
             "quantity": self.quantity,
             "sale_amount": self.sale_amount,
             "date_sold": self.date_sold,
+            "payment_confirmed": self.payment_confirmed,
             }
