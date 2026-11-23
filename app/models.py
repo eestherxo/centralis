@@ -46,12 +46,33 @@ class VisitorType(str, Enum):
     POSTGRAD = "postgraduate"
     EXTERNAL = "external"
 
+class Role(str, Enum):
+    ADMIN = "admin"
+    STAFF = "staff"
+
+
+@dataclass
+class User:
+    id: int | None = field(default=None, kw_only=True)
+    name: str
+    email: str
+    password: str = field(repr=False)
+    role: Role = field(default=Role.STAFF, kw_only=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "password": self.password,
+            "role": self.role.value,
+        }
+
 
 @dataclass
 class Visitor:
     id: int | None = field(default=None, kw_only=True)
-    student_id: int | None = field(default=None, kw_only=True)
-    id_number: str | None = field(default=None, kw_only=True)
+    student_id: str | None = field(default=None, kw_only=True)
     name: str 
     phone_number: str
     type: VisitorType
@@ -62,7 +83,6 @@ class Visitor:
         return {
             "id": self.id,
             "student_id": self.student_id,
-            "id_number": self.id_number,
             "name": self.name,
             "phone_number": self.phone_number,
             "type": self.type.value,

@@ -24,7 +24,7 @@ def test_create_book_model_in_file(temp_data_dir):
     assert record["name"] == "Animal Farm"
 
 
-def test_create_record_makes_missing_data_directory(tmp_path, monkeypatch):
+def test_create_record_makes_data_directory(tmp_path, monkeypatch):
     data_dir = tmp_path / "nested" / "data"
     monkeypatch.setattr(data_access, "DB_DIR", data_dir)
 

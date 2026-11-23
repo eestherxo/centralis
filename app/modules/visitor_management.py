@@ -123,7 +123,7 @@ def register_visitor(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
             if isinstance(faculty, str)
             else None
         ),
-        id_number=id_number or None,
+        student_id=id_number or None,
     )
     saved_visitor = data_access.create("visitor", visitor.to_dict())
     visit = data_access.create(
