@@ -4,9 +4,6 @@ __pycache__/
 .pytest_cache/
 *.py[cod]
 
-# Generated reports
-sample_excel_reports/
-
 # Node.js / Vue
 node_modules/
 dist/

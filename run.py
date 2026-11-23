@@ -12,7 +12,6 @@ from app.routes.reports import reports_bp
 from app.routes.sales import sales_bp
 from app.models import Role 
 from app.modules.authentication import create_user
-from app.modules.report_generation import get_report_records
 from app import data_access
 
 load_dotenv()
@@ -24,7 +23,6 @@ jwt_secret = os.getenv("JWT_SECRET_KEY")
 app.config.update(
     JWT_SECRET_KEY=jwt_secret,
     JWT_ACCESS_TOKEN_EXPIRES=timedelta(minutes=60),
-    REPORT_RECORD_PROVIDER=get_report_records,
 )
 
 JWTManager(app)
