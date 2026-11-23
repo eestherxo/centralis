@@ -18,7 +18,7 @@ class ReportRouteTests(unittest.TestCase):
                 {
                     "visitor_id": "V-001",
                     "name": "Maya Brown",
-                    "type": "Undergraduate",
+                    "type": "undergraduate",
                     "check_in": "2026-11-02T09:30:00+00:00",
                 }
             ],

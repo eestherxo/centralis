@@ -204,13 +204,13 @@ class ReportTests(unittest.TestCase):
             {
                 "visitor_id": "V-003",
                 "name": "Leah Grant",
-                "type": "Undergraduate",
+                "type": "undergraduate",
                 "check_in": "2026-11-03",
             },
             {
                 "visitor_id": "V-004",
                 "name": "Owen Clarke",
-                "type": "Outside Personnel",
+                "type": "external",
                 "check_in": "2026-11-04",
             },
         ]
@@ -219,23 +219,37 @@ class ReportTests(unittest.TestCase):
             "visitor", visits, START_DATE, END_DATE, ADMIN
         )
 
-        categories = {record["type"] for record in report["records"]}
-        self.assertEqual(categories, {"Undergraduate", "Outside Personnel"})
+        categories = {
+            record["name"]: record["type"]
+            for record in report["records"]
+        }
+        self.assertEqual(
+            categories,
+            {
+                "Leah Grant": "undergraduate",
+                "Owen Clarke": "external",
+            },
+        )
+        self.assertTrue(
+            all(record["visit_frequency"] == 1 for record in report["records"])
+        )
 
     # TC-3.13: Reservation statuses are reported separately.
     def test_13_reservation_statuses(self):
         reservations = [
             {
+                "id": "RS-003",
                 "visitor_id": "Maya Brown",
                 "resource_id": "Seminar Room 1",
                 "request_date": "2026-11-10",
-                "status": "Approved",
+                "status": "declined",
             },
             {
+                "id": "RS-004",
                 "visitor_id": "Daniel King",
                 "resource_id": "Meeting Room 2",
                 "request_date": "2026-11-11",
-                "status": "Rejected",
+                "status": "cancelled",
             },
         ]
 
@@ -243,141 +257,304 @@ class ReportTests(unittest.TestCase):
             "reservation", reservations, START_DATE, END_DATE, ADMIN
         )
 
+        statuses = {
+            record["id"]: record["status"]
+            for record in report["records"]
+        }
         self.assertEqual(
-            {record["status"] for record in report["records"]},
-            {"Approved", "Rejected"},
+            statuses,
+            {
+                "RS-003": "declined",
+                "RS-004": "cancelled",
+            },
         )
 
     # TC-3.14: Different reserved resource types are shown.
-    def test_14_reservation_resource_types(self):
+    def test_14_different_reserved_resources(self):
         reservations = [
             {
+                "id": "RS-005",
                 "visitor_id": "Maya Brown",
                 "resource_id": "Seminar Room 1",
-                "request_date": "2026-11-10",
-                "status": "Approved",
+                "request_date": "2026-11-13",
+                "status": "approved",
             },
             {
+                "id": "RS-006",
                 "visitor_id": "Daniel King",
-                "resource_id": "Projector 1",
-                "request_date": "2026-11-11",
-                "status": "Approved",
+                "resource_id": "Archival A-003",
+                "request_date": "2026-11-14",
+                "status": "pending",
+            },
+            {
+                "id": "RS-007",
+                "visitor_id": "Leah Grant",
+                "resource_id": "Book B-020",
+                "request_date": "2026-11-15",
+                "status": "cancelled",
             },
         ]
 
         report = generate_report(
-            "reservation", reservations, START_DATE, END_DATE, ADMIN
+            "reservation",
+            reservations,
+            "2026-11-13",
+            "2026-11-15",
+            ADMIN,
         )
 
+        reported = {
+            record["id"]: (
+                record["resource_id"],
+                record["request_date"],
+                record["status"],
+            )
+            for record in report["records"]
+        }
         self.assertEqual(
-            {record["resource_id"] for record in report["records"]},
-            {"Seminar Room 1", "Projector 1"},
+            reported,
+            {
+                "RS-005": ("Seminar Room 1", "2026-11-13", "approved"),
+                "RS-006": ("Archival A-003", "2026-11-14", "pending"),
+                "RS-007": ("Book B-020", "2026-11-15", "cancelled"),
+            },
         )
 
     # TC-3.15: Multiple sales of the same journal are all included.
     def test_15_multiple_sales_same_journal(self):
         sales = [
             {
-                "journal_id": "Social and Economic Studies",
+                "id": "SALE-002",
+                "journal_id": "J-001",
                 "quantity": 1,
-                "date_sold": "2026-11-12",
-                "sale_amount": 2500.00,
+                "date_sold": "2026-11-13",
+                "sale_amount": 1500.00,
             },
             {
-                "journal_id": "Social and Economic Studies",
+                "id": "SALE-003",
+                "journal_id": "J-001",
                 "quantity": 3,
-                "date_sold": "2026-11-13",
-                "sale_amount": 7500.00,
+                "date_sold": "2026-11-14",
+                "sale_amount": 4500.00,
             },
         ]
 
         report = generate_report(
-            "journal_sales", sales, START_DATE, END_DATE, ADMIN
+            "journal_sales",
+            sales,
+            "2026-11-13",
+            "2026-11-14",
+            ADMIN,
         )
 
-        self.assertEqual(len(report["records"]), 2)
-        self.assertEqual(sum(item["quantity"] for item in report["records"]), 4)
+        reported = {
+            record["id"]: (
+                record["journal_id"],
+                record["quantity"],
+                record["date_sold"],
+                record["sale_amount"],
+            )
+            for record in report["records"]
+        }
+
+        self.assertEqual(
+            reported,
+            {
+                "SALE-002": ("J-001", 1, "2026-11-13", 1500.00),
+                "SALE-003": ("J-001", 3, "2026-11-14", 4500.00),
+            },
+        )
 
     # TC-3.16: Different journals sold on the same date remain separate.
     def test_16_different_journals_same_date(self):
         sales = [
             {
-                "journal_id": "Journal A",
-                "quantity": 1,
-                "date_sold": "2026-11-12",
-                "sale_amount": 2000.00,
+                "id": "SALE-004",
+                "journal_id": "J-002",
+                "quantity": 2,
+                "date_sold": "2026-11-15",
+                "sale_amount": 2500.00,
             },
             {
-                "journal_id": "Journal B",
-                "quantity": 2,
-                "date_sold": "2026-11-12",
-                "sale_amount": 4000.00,
+                "id": "SALE-005",
+                "journal_id": "J-003",
+                "quantity": 1,
+                "date_sold": "2026-11-15",
+                "sale_amount": 2000.00,
             },
         ]
 
         report = generate_report(
-            "journal_sales", sales, START_DATE, END_DATE, ADMIN
+            "journal_sales",
+            sales,
+            "2026-11-15",
+            "2026-11-15",
+            ADMIN,
         )
 
+        reported = {
+            record["id"]: (
+                record["journal_id"],
+                record["quantity"],
+                record["date_sold"],
+                record["sale_amount"],
+            )
+            for record in report["records"]
+        }
+
         self.assertEqual(
-            {record["journal_id"] for record in report["records"]},
-            {"Journal A", "Journal B"},
+            reported,
+            {
+                "SALE-004": ("J-002", 2, "2026-11-15", 2500.00),
+                "SALE-005": ("J-003", 1, "2026-11-15", 2000.00),
+            },
         )
 
     # TC-3.17: Different fine types remain distinguishable.
-    def test_17_fine_types(self):
+    def test_17_fine_reasons(self):
         fines = [
             {
-                "visitor_id": "Maya Brown",
-                "reason": "Overdue",
-                "amount": 150.00,
-                "resource_id": "Book A",
-                "date_issued": "2026-11-15",
-                "status": "Unpaid",
+                "id": "FINE-002",
+                "visitor_id": "V-004",
+                "reason": "late",
+                "amount": 100.00,
+                "resource_id": "B-020",
+                "date_issued": "2026-11-16",
+                "status": "unpaid",
             },
             {
-                "visitor_id": "Daniel King",
-                "reason": "Damaged",
+                "id": "FINE-003",
+                "visitor_id": "V-005",
+                "reason": "lost",
+                "amount": 2500.00,
+                "resource_id": "B-021",
+                "date_issued": "2026-11-17",
+                "status": "unpaid",
+            },
+            {
+                "id": "FINE-004",
+                "visitor_id": "V-006",
+                "reason": "damaged",
                 "amount": 1200.00,
-                "resource_id": "Book B",
-                "date_issued": "2026-11-16",
-                "status": "Unpaid",
+                "resource_id": "J-005",
+                "date_issued": "2026-11-18",
+                "status": "unpaid",
             },
         ]
 
-        report = generate_report("fines", fines, START_DATE, END_DATE, ADMIN)
+        report = generate_report(
+            "fines",
+            fines,
+            "2026-11-16",
+            "2026-11-18",
+            ADMIN,
+        )
+
+        reported = {
+            record["id"]: (
+                record["visitor_id"],
+                record["reason"],
+                record["amount"],
+                record["resource_id"],
+                record["date_issued"],
+                record["status"],
+            )
+            for record in report["records"]
+        }
 
         self.assertEqual(
-            {record["reason"] for record in report["records"]},
-            {"Overdue", "Damaged"},
+            reported,
+            {
+                "FINE-002": (
+                    "V-004",
+                    "late",
+                    100.00,
+                    "B-020",
+                    "2026-11-16",
+                    "unpaid",
+                ),
+                "FINE-003": (
+                    "V-005",
+                    "lost",
+                    2500.00,
+                    "B-021",
+                    "2026-11-17",
+                    "unpaid",
+                ),
+                "FINE-004": (
+                    "V-006",
+                    "damaged",
+                    1200.00,
+                    "J-005",
+                    "2026-11-18",
+                    "unpaid",
+                ),
+            },
         )
 
     # TC-3.18: Paid and unpaid fines are both reported accurately.
     def test_18_fine_payment_statuses(self):
         fines = [
             {
-                "visitor_id": "Maya Brown",
-                "reason": "Overdue",
-                "amount": 150.00,
-                "resource_id": "Book A",
-                "date_issued": "2026-11-15",
-                "status": "Paid",
+                "id": "FINE-005",
+                "visitor_id": "V-007",
+                "reason": "late",
+                "amount": 50.00,
+                "resource_id": "B-022",
+                "date_issued": "2026-11-19",
+                "status": "paid",
             },
             {
-                "visitor_id": "Daniel King",
-                "reason": "Damaged",
-                "amount": 1200.00,
-                "resource_id": "Book B",
-                "date_issued": "2026-11-16",
-                "status": "Unpaid",
+                "id": "FINE-006",
+                "visitor_id": "V-008",
+                "reason": "damaged",
+                "amount": 200.00,
+                "resource_id": "B-023",
+                "date_issued": "2026-11-20",
+                "status": "unpaid",
             },
         ]
 
-        report = generate_report("fines", fines, START_DATE, END_DATE, ADMIN)
+        report = generate_report(
+            "fines",
+            fines,
+            "2026-11-19",
+            "2026-11-20",
+            ADMIN,
+        )
+
+        reported = {
+            record["id"]: (
+                record["visitor_id"],
+                record["reason"],
+                record["amount"],
+                record["resource_id"],
+                record["date_issued"],
+                record["status"],
+            )
+            for record in report["records"]
+        }
 
         self.assertEqual(
-            {record["status"] for record in report["records"]},
-            {"Paid", "Unpaid"},
+            reported,
+            {
+                "FINE-005": (
+                    "V-007",
+                    "late",
+                    50.00,
+                    "B-022",
+                    "2026-11-19",
+                    "paid",
+                ),
+                "FINE-006": (
+                    "V-008",
+                    "damaged",
+                    200.00,
+                    "B-023",
+                    "2026-11-20",
+                    "unpaid",
+                ),
+            },
         )
 
     # TC-3.19: A generated report can be exported to Microsoft Excel.
@@ -386,18 +563,23 @@ class ReportTests(unittest.TestCase):
             {
                 "visitor_id": "V-001",
                 "name": "Maya Brown",
-                "type": "Undergraduate",
+                "type": "undergraduate",
                 "check_in": "2026-11-02",
             },
             {
                 "visitor_id": "V-002",
                 "name": "Omar Lewis",
-                "type": "Outside Personnel",
+                "type": "external",
                 "check_in": "2026-11-03",
             },
         ]
+
         report = generate_report(
-            "visitor", visits, START_DATE, END_DATE, ADMIN
+            "visitor",
+            visits,
+            "2026-11-01",
+            "2026-11-07",
+            ADMIN,
         )
 
         with TemporaryDirectory() as directory:
@@ -407,11 +589,14 @@ class ReportTests(unittest.TestCase):
             self.assertTrue(exported_path.exists())
             self.assertEqual(exported_path.suffix, ".xlsx")
 
-            worksheet = load_workbook(exported_path).active
+            workbook = load_workbook(exported_path)
+            worksheet = workbook.active
+
+            self.assertEqual(worksheet.title, "Visitor Report")
             self.assertEqual(worksheet["A1"].value, "Visitor Report")
             self.assertEqual(
                 worksheet["A2"].value,
-                f"Date range: {START_DATE} to {END_DATE}",
+                "Date range: 2026-11-01 to 2026-11-07",
             )
 
             headings = [cell.value for cell in worksheet[4]]
@@ -426,29 +611,34 @@ class ReportTests(unittest.TestCase):
                 ],
             )
 
-            exported_rows = [list(row) for row in worksheet.iter_rows(
-                min_row=5, values_only=True
-            )]
-            self.assertIn(
-                [
-                    "V-001",
-                    "Maya Brown",
-                    "Undergraduate",
-                    "2026-11-02",
-                    1,
-                ],
+            exported_rows = [
+                list(row)
+                for row in worksheet.iter_rows(
+                    min_row=5,
+                    values_only=True,
+                )
+            ]
+            self.assertEqual(
                 exported_rows,
-            )
-            self.assertIn(
                 [
-                    "V-002",
-                    "Omar Lewis",
-                    "Outside Personnel",
-                    "2026-11-03",
-                    1,
+                    [
+                        "V-001",
+                        "Maya Brown",
+                        "undergraduate",
+                        "2026-11-02",
+                        1,
+                    ],
+                    [
+                        "V-002",
+                        "Omar Lewis",
+                        "external",
+                        "2026-11-03",
+                        1,
+                    ],
                 ],
-                exported_rows,
             )
+
+            workbook.close()
 
 
 if __name__ == "__main__":

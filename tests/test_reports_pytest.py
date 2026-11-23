@@ -76,9 +76,9 @@ def test_visitor_frequency_and_categories_are_reported(mock_records):
 
     assert maya["visit_frequency"] == 2
     assert categories == {
-        "Undergraduate",
-        "Postgraduate",
-        "Outside Personnel",
+        "undergraduate",
+        "postgraduate",
+        "external",
     }
 
 
