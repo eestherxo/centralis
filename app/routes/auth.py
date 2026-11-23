@@ -1,6 +1,6 @@
 
-from flask import Blueprint, request
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+from flask import Blueprint, request  # type: ignore[reportMissingImports]
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required  # type: ignore
 
 from app import data_access
 from app.models import Role

@@ -1,19 +1,62 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import RegisterForm from './components/RegisterForm.vue'
 import CheckForm from './components/CheckForm.vue'
+import AdminLogin from './components/AdminLogin.vue'
+import AdminDashboard from './components/AdminDashboard.vue'
 
 const tab = ref('register')
 const prefill = ref(null)
+const page = ref('visitor')
+const adminSession = ref(null)
 
 function onExists(payload) {
   prefill.value = payload
   tab.value = 'check'
 }
+
+function onAuthenticated(session) {
+  adminSession.value = session
+  sessionStorage.setItem('centralis-admin-session', JSON.stringify(session))
+  page.value = 'dashboard'
+}
+
+function signOut() {
+  sessionStorage.removeItem('centralis-admin-session')
+  adminSession.value = null
+  page.value = 'visitor'
+}
+
+onMounted(() => {
+  const savedSession = sessionStorage.getItem('centralis-admin-session')
+  if (!savedSession) return
+
+  try {
+    const session = JSON.parse(savedSession)
+    if (session?.token && session?.user?.role === 'admin') {
+      adminSession.value = session
+      page.value = 'dashboard'
+    } else {
+      sessionStorage.removeItem('centralis-admin-session')
+    }
+  } catch {
+    sessionStorage.removeItem('centralis-admin-session')
+  }
+})
 </script>
 
 <template>
-  <main class="card">
+  <AdminLogin
+    v-if="page === 'admin-login'"
+    @authenticated="onAuthenticated"
+    @back="page = 'visitor'"
+  />
+  <AdminDashboard
+    v-else-if="page === 'dashboard' && adminSession"
+    :session="adminSession"
+    @sign-out="signOut"
+  />
+  <main v-else class="card">
     <section class="campus-panel" aria-label="SALISES campus">
       <img class="campus-image" src="/campus.png" alt="SALISES at the University of the West Indies" />
     </section>
@@ -37,6 +80,9 @@ function onExists(payload) {
 
         <RegisterForm v-if="tab === 'register'" @exists="onExists" />
         <CheckForm v-else :prefill="prefill" />
+        <button class="text-button admin-entry" type="button" @click="page = 'admin-login'">
+          Administrator sign in
+        </button>
       </div>
     </section>
   </main>

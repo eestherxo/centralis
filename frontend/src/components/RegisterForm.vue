@@ -27,22 +27,23 @@ async function submit() {
   if (isStudent()) {
     body.id_number = form.id_number
     body.faculty = form.faculty
-  } else if (form.id_number.trim()) {
-    body.id_number = form.id_number   // optional for externals
   }
 
   busy.value = true
   try {
     const { ok, status, data } = await post('/visitors/register', body)
     if (ok) {
-      banner.value = { ok: true, text: `${data.message} Checked in at ${fmt(data.visit.check_in)}.` }
+      const visitorId = form.type === 'external'
+        ? ` Your visitor ID is ${data.visitor.id}; use it for future visits.`
+        : ''
+      banner.value = {
+        ok: true,
+        text: `${data.message} Checked in at ${fmt(data.visit.check_in)}.${visitorId}`,
+      }
       Object.assign(form, blank())
     } else if (status === 409) {
-      const hasId = !!(body.id_number && body.id_number.trim())
       emit('exists', {
-        mode: hasId ? 'id' : 'phone',
         id_number: body.id_number || '',
-        phone_number: body.phone_number,
         purpose: body.purpose,
         message: data.error,
       })
@@ -79,7 +80,7 @@ async function submit() {
       <span class="err">{{ errors.phone_number }}</span>
     </label>
 
-    <label>ID number <small v-if="!isStudent()">(optional)</small>
+    <label v-if="isStudent()">ID number
       <input v-model="form.id_number" :class="{ bad: errors.id_number }" placeholder="e.g. 620123456" />
       <span class="err">{{ errors.id_number }}</span>
     </label>
