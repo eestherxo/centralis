@@ -82,11 +82,11 @@ def test_full_journal_sale_workflow(client):
     )
     assert report.status_code == 200
     assert report.json["records"] == [{
-        "sale_id": sale["id"],
-        "journal": "Social and Economic Studies",
+        "id": sale["id"],
+        "journal_id": journal["id"],
         "quantity": 2,
-        "sale_date": "2026-11-18",
-        "total_amount": 20.0,
+        "date_sold": "2026-11-18",
+        "sale_amount": 20.0,
     }]
 
 

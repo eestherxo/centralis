@@ -196,14 +196,14 @@ class Reservation(ABC):
 
 
 @dataclass
-class OnsitReservation(Reservation):
+class OnsiteReservation(Reservation):
     start_time: time
     end_time: time
     reserve_date: date 
 
 
 @dataclass
-class RoomReservation(OnsitReservation):
+class RoomReservation(OnsiteReservation):
     type: ClassVar[ResourceType] = ResourceType.ROOM
     occupants: int 
 
@@ -211,26 +211,36 @@ class RoomReservation(OnsitReservation):
         object = super().to_dict()
         object.update(
             {
-                "occupants": self.occupants
+                "occupants": self.occupants,
+                "start_time": self.start_time,
+                "end_time": self.end_time,
+                "reserve_date": self.reserve_date,
             }
         )
         return object
 
     
 @dataclass
-class ArchivalReservation(OnsitReservation):
+class ArchivalReservation(OnsiteReservation):
     type: ClassVar[ResourceType] = ResourceType.ARCHIVAL
 
     def to_dict(self):
         object = super().to_dict()
+        object.update(
+            {
+                "start_time": self.start_time,
+                "end_time": self.end_time,
+                "reserve_date": self.reserve_date, 
+            }
+        )
         return object
 
     
 @dataclass
-class BookReservation(OnsitReservation):
+class BookReservation(Reservation):
     type: ClassVar[ResourceType] = ResourceType.BOOK
     expected_return: date  
-    actual_return: date 
+    actual_return: date | None = field(default=None, kw_only=True)
 
     def to_dict(self):
         object = super().to_dict()

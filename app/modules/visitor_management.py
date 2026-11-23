@@ -30,23 +30,23 @@ def _validate_required_fields(data: dict[str, Any], fields: tuple[str, ...]) -> 
     if errors:
         raise VisitorManagementError("Invalid visitor details.", 400, errors)
 
-
-def _find_visitor(id_number: str | None) -> dict[str, Any] | None:
-    if not isinstance(id_number, str):
+# student ID can be used to find a student at registration to prevent duplicate registration 
+def _find_visitor_by_student_id(student_id: str | None) -> dict[str, Any] | None:
+    if not isinstance(student_id, str):
         return None
-    normalized_id = id_number.strip().casefold()
+    normalized_id = student_id.strip().casefold()
     return next(
         (
             visitor
             for visitor in data_access.get_all_records("visitor")
-            if isinstance(visitor.get("id_number"), str)
-            and visitor["id_number"].strip().casefold() == normalized_id
+            if isinstance(visitor.get("id"), str)
+            and visitor["id"].strip().casefold() == normalized_id
         ),
         None,
     )
 
 
-def _find_visitor_by_record_id(visitor_id: int) -> dict[str, Any] | None:
+def _find_visitor(visitor_id: int) -> dict[str, Any] | None:
     return next(
         (
             visitor
@@ -85,18 +85,18 @@ def register_visitor(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
 
     required_fields = COMMON_VISITOR_FIELDS
     if visitor_type in STUDENT_VISITOR_TYPES:
-        required_fields += ("id_number", "faculty")
+        required_fields += ("student_id", "faculty")
     _validate_required_fields(data, required_fields)
 
-    raw_id_number = data.get("id_number")
+    raw_student_id = data.get("student_id")
     if visitor_type is VisitorType.EXTERNAL:
-        if raw_id_number is not None and (
-            not isinstance(raw_id_number, str) or raw_id_number.strip()
+        if raw_student_id is not None and (
+            not isinstance(raw_student_id, str) or raw_student_id.strip()
         ):
             raise VisitorManagementError(
                 "Invalid visitor details.",
                 400,
-                {"id_number": "Only students may provide an ID number."},
+                {"student_id": "Only students may provide an ID number."},
             )
         if data.get("faculty") is not None and not isinstance(data["faculty"], str):
             raise VisitorManagementError(
@@ -104,7 +104,9 @@ def register_visitor(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
                 400,
                 {"faculty": "Enter a valid faculty."},
             )
-    elif _find_visitor(raw_id_number):
+    # external visitors dont have a student ID so duplicate registration can happen    
+    # use a combination of name and phone number to prevent duplicate registration 
+    elif _find_visitor_by_student_id(raw_student_id): 
         raise VisitorManagementError(
             "This visitor is already registered. Please check in with the existing record.",
             409,
@@ -112,7 +114,7 @@ def register_visitor(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
 
     purpose = data["purpose"].strip()
     faculty = data.get("faculty")
-    id_number = raw_id_number.strip() if isinstance(raw_id_number, str) else None
+    student_id = raw_student_id.strip() if isinstance(raw_student_id, str) else None
     visitor = Visitor(
         name=data["name"].strip(),
         phone_number=data["phone_number"].strip(),
@@ -123,7 +125,7 @@ def register_visitor(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
             if isinstance(faculty, str)
             else None
         ),
-        student_id=id_number or None,
+        student_id=student_id or None,
     )
     saved_visitor = data_access.create("visitor", visitor.to_dict())
     visit = data_access.create(
@@ -138,27 +140,7 @@ def register_visitor(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
     return saved_visitor, visit
 
 
-def _find_visitor_for_visit(
-    id_number: str | None,
-    visitor_id: int | None,
-) -> dict[str, Any] | None:
-    if isinstance(id_number, str) and id_number.strip():
-        visitor = _find_visitor(id_number)
-        if visitor is not None:
-            return visitor
-    if visitor_id is not None:
-        return _find_visitor_by_record_id(visitor_id)
-    return None
-
-
-def _validate_visitor_identifier(
-    id_number: str | None,
-    visitor_id: int | None,
-) -> None:
-    if id_number is not None and not isinstance(id_number, str):
-        raise VisitorManagementError(
-            "Invalid visitor details.", 400, {"id_number": "Enter a valid ID number."}
-        )
+def _validate_visitor_identifier(visitor_id: int) -> None:
     if visitor_id is not None:
         if (
             isinstance(visitor_id, int)
@@ -171,23 +153,13 @@ def _validate_visitor_identifier(
             400,
             {"visitor_id": "Enter a valid visitor ID."},
         )
-    if id_number is not None and id_number.strip():
-        return
-    raise VisitorManagementError(
-        "Invalid visitor details.",
-        400,
-        {"id_number": "Provide an ID number or visitor ID."},
-    )
+    
 
 
-def check_in_visitor(
-    id_number: str | None,
-    purpose: str,
-    visitor_id: int | None = None,
-) -> dict[str, Any]:
+def check_in_visitor(purpose: str, visitor_id: int) -> dict[str, Any]:
     _validate_required_fields({"purpose": purpose}, ("purpose",))
-    _validate_visitor_identifier(id_number, visitor_id)
-    visitor = _find_visitor_for_visit(id_number, visitor_id)
+    _validate_visitor_identifier(visitor_id)
+    visitor = _find_visitor(visitor_id)
     if visitor is None:
         raise VisitorManagementError(
             "Visitor is not registered. Please register first.", 404
@@ -208,12 +180,9 @@ def check_in_visitor(
     )
 
 
-def check_out_visitor(
-    id_number: str | None,
-    visitor_id: int | None = None,
-) -> dict[str, Any]:
-    _validate_visitor_identifier(id_number, visitor_id)
-    visitor = _find_visitor_for_visit(id_number, visitor_id)
+def check_out_visitor(visitor_id: int) -> dict[str, Any]:
+    _validate_visitor_identifier(visitor_id)
+    visitor = _find_visitor(visitor_id)
     if visitor is None:
         raise VisitorManagementError("Visitor is not registered.", 404)
 

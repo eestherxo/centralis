@@ -1,6 +1,7 @@
 import pytest
 
 from app import data_access
+from app.modules.authentication import create_user
 from run import app
 
 
@@ -8,12 +9,39 @@ from run import app
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(data_access, "DB_DIR", tmp_path)
     monkeypatch.setitem(app.config, "TESTING", True)
+    monkeypatch.setitem(
+    app.config,
+    "JWT_SECRET_KEY",
+    "test-secret-key-that-is-long-enough-123",
+)
 
     with app.test_client() as test_client:
         yield test_client
 
+@pytest.fixture
+def admin_headers(client):
+    _, status = create_user({
+        "name": "Test Admin",
+        "email": "admin@test.example",
+        "password": "test-password-123",
+        "role": "admin",
+    })
+    assert status == 201
 
-def add_book(client):
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": "admin@test.example",
+            "password": "test-password-123",
+        },
+    )
+    assert response.status_code == 200
+
+    return {
+        "Authorization": f"Bearer {response.json['access_token']}"
+    }
+
+def add_book(client, admin_headers):
     return client.post(
         "/inventory/add",
         json={
@@ -25,11 +53,12 @@ def add_book(client):
                 "genre": "Dystopian",
             },
         },
+        headers=admin_headers
     )
 
 
-def test_add_book(client):
-    response = add_book(client)
+def test_add_book(client, admin_headers):
+    response = add_book(client, admin_headers)
 
     assert response.status_code == 201
     record = response.json["book"]
@@ -39,22 +68,24 @@ def test_add_book(client):
     assert record["status"] == "available"
 
 
-def test_invalid_resource_type(client):
+def test_invalid_resource_type(client, admin_headers):
     response = client.post(
         "/inventory/add",
         json={"type": "spaceship", "data": {"name": "Enterprise"}},
+        headers=admin_headers
     )
 
     assert response.status_code == 400
 
 
-def test_update_resource(client):
-    created = add_book(client).json["book"]
+def test_update_resource(client, admin_headers):
+    created = add_book(client, admin_headers).json["book"]
     resource_id = created["id"]
 
     response = client.put(
         f"/inventory/book/{resource_id}",
         json={"data": {"status": "reserved"}},
+        headers=admin_headers
     )
 
     assert response.status_code == 200
@@ -64,21 +95,26 @@ def test_update_resource(client):
     rejected = client.put(
         f"/inventory/book/{resource_id}",
         json={"data": {"id": 123}},
+        headers=admin_headers
     )
     assert rejected.status_code == 400
 
 
-def test_delete_resource(client):
-    created = add_book(client).json["book"]
+def test_delete_resource(client, admin_headers):
+    created = add_book(client, admin_headers).json["book"]
 
-    response = client.delete(f"/inventory/book/{created['id']}")
+    response = client.delete(
+        f"/inventory/book/{created['id']}", 
+        headers=admin_headers
+        )
 
     assert response.status_code == 200
     assert data_access.get_record("book", created["id"]) is None
 
 
-def test_cannot_delete_resource_with_pending_reservation(client):
-    created = add_book(client).json["book"]
+def test_cannot_delete_resource_with_pending_reservation(client, admin_headers):
+    created = add_book(client, admin_headers
+    ).json["book"]
     data_access.create(
         "reservation",
         {
@@ -88,24 +124,29 @@ def test_cannot_delete_resource_with_pending_reservation(client):
         },
     )
 
-    response = client.delete(f"/inventory/book/{created['id']}")
+    response = client.delete(
+        f"/inventory/book/{created['id']}",
+        headers=admin_headers
+        )
 
     assert response.status_code == 409
     assert data_access.get_record("book", created["id"]) is not None
 
 
-def test_available_endpoint(client):
-    first = add_book(client).json["book"]
-    second = add_book(client).json["book"]
-    third = add_book(client).json["book"]
+def test_available_endpoint(client, admin_headers):
+    first = add_book(client, admin_headers).json["book"]
+    second = add_book(client, admin_headers).json["book"]
+    third = add_book(client, admin_headers).json["book"]
 
     client.put(
         f"/inventory/book/{second['id']}",
         json={"data": {"status": "reserved"}},
+        headers=admin_headers
     )
     client.put(
         f"/inventory/book/{third['id']}",
         json={"data": {"condition": "damaged"}},
+        headers=admin_headers
     )
 
     response = client.get("/inventory/available?type=book")

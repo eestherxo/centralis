@@ -129,6 +129,13 @@ def generate_receipt_pdf(sale_id):
     pdf.drawCentredString(width / 2, 60, "Thank you for your purchase.")
 
     pdf.save()
+
+    receipt_dir = data_access.DB_DIR / "receipts"
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+
+    receipt_path = receipt_dir / f"receipt-{sale_id}.pdf"
+    receipt_path.write_bytes(buffer.getvalue())
+
     buffer.seek(0)
     return buffer
 
