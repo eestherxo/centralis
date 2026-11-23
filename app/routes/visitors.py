@@ -38,19 +38,6 @@ def _visitor_record_id(data: dict[str, Any]) -> int | None:
     )
 
 
-# def _optional_visitor_text(data: dict[str, Any], field: str) -> str | None:
-#     value = data.get(field)
-#     if value is None:
-#         return None
-#     if not isinstance(value, str):
-#         raise VisitorManagementError(
-#             "Invalid visitor details.",
-#             400,
-#             {field: "Enter a valid value."},
-#         )
-#     return value
-
-
 def _required_visitor_text(data: dict[str, Any], field: str) -> str:
     value = data.get(field)
     if not isinstance(value, str) or not value.strip():
@@ -60,6 +47,16 @@ def _required_visitor_text(data: dict[str, Any], field: str) -> str:
             {field: "This field is required."},
         )
     return value
+
+
+
+def _require_visitor_id(data: dict[str, Any]) -> int:
+    visitor_id = _visitor_record_id(data)
+    if visitor_id is None:
+        raise VisitorManagementError(
+            "Invalid visitor details.", 400, {"visitor_id": "This field is required."}
+        )
+    return visitor_id
 
 
 @visitors_bp.post("/register")
@@ -84,7 +81,7 @@ def check_in_visitor():
         
         visit = manage_check_in(
             _required_visitor_text(data, "purpose"),
-            int(_required_visitor_text(data, "visitor_id"))
+            _require_visitor_id(data)
         )
     except VisitorManagementError as error:
         return _error_response(error)
@@ -99,7 +96,7 @@ def check_out_visitor():
     try:
         data = _json_body()
         updated_visit = manage_check_out(
-            int(_required_visitor_text(data, "visitor_id"))
+            _require_visitor_id(data)
         )
     except VisitorManagementError as error:
         return _error_response(error)

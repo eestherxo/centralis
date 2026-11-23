@@ -45,6 +45,18 @@ def _find_visitor_by_student_id(student_id: str | None) -> dict[str, Any] | None
         None,
     )
 
+def _digits(text):
+    return "".join(ch for ch in text if ch.isdigit())
+
+
+def _find_visitor_by_name_and_phone(name, phone):
+    wanted_name, wanted_phone = name.strip().casefold(), _digits(phone)
+    return next(
+        (v for v in data_access.get_all_records("visitor")
+         if str(v.get("name", "")).strip().casefold() == wanted_name
+         and _digits(str(v.get("phone_number", ""))) == wanted_phone),
+        None,
+    )
 
 def _find_visitor(visitor_id: int) -> dict[str, Any] | None:
     return next(
@@ -104,9 +116,12 @@ def register_visitor(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
                 400,
                 {"faculty": "Enter a valid faculty."},
             )
-    # external visitors dont have a student ID so duplicate registration can happen    
-    # use a combination of name and phone number to prevent duplicate registration 
-    elif _find_visitor_by_student_id(raw_student_id): 
+
+    if visitor_type in STUDENT_VISITOR_TYPES:
+        existing = _find_visitor_by_student_id(raw_student_id)
+    else:
+        existing = _find_visitor_by_name_and_phone(data["name"], data["phone_number"])
+    if existing:
         raise VisitorManagementError(
             "This visitor is already registered. Please check in with the existing record.",
             409,
@@ -120,11 +135,7 @@ def register_visitor(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
         phone_number=data["phone_number"].strip(),
         type=visitor_type,
         purpose=purpose,
-        faculty=(
-            faculty.strip() or None
-            if isinstance(faculty, str)
-            else None
-        ),
+        faculty=faculty.strip() or None if isinstance(faculty, str) else None,
         student_id=student_id or None,
     )
     saved_visitor = data_access.create("visitor", visitor.to_dict())
