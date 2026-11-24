@@ -1,5 +1,6 @@
 
-from flask import Blueprint, request  # type: ignore[reportMissingImports]
+from flask import Blueprint
+request  # type: ignore[reportMissingImports]
 from flask_jwt_extended import jwt_required, get_jwt_identity  # type: ignore[reportMissingImports]
 from app.modules import resource_management, authentication
 
@@ -9,6 +10,7 @@ inventory_bp = Blueprint("resource", __name__, url_prefix="/inventory")
 
 @inventory_bp.post("/add")
 @jwt_required()
+
 def add_resource_record():
 
     user_id = get_jwt_identity()
