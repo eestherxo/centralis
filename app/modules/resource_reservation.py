@@ -15,9 +15,9 @@ from app.models import (
 )
 
 RESOURCE_TYPES = {
-    ResourceType.BOOK.value: Book,
-    ResourceType.ARCHIVAL.value: ArchivalItem,
-    ResourceType.ROOM.value: Room
+    ResourceType.BOOK.value: BookReservation,
+    ResourceType.ARCHIVAL.value: ArchivalReservation,
+    ResourceType.ROOM.value: RoomReservation
 }
 
 RESOURCE_STATUS = {
@@ -45,14 +45,14 @@ RESERVATION_TYPES = {
 }
 
 EDITABLE_FIELDS = {
-    "room": {"name", "start time", "end time", "date", "occupants"},
-    "archival": {"name", "start time", "end time", "date"},
-    "book": {"name", "return date"}
+    "room": {"visitor_id", "name", "start_time", "end_time", "date", "occupants"},
+    "archival": {"visitor_id", "name", "start_time", "end_time", "date"},
+    "book": {"visitor_id", "name", "return_date"}
 }
 
 #Placeholder hours
-OPEN_TIME = time(8, 30)
-CLOSE_TIME = time(16, 10)
+OPEN_TIME = time(9, 0)
+CLOSE_TIME = time(17, 0)
 
 #helper functions
 def find_resource_by_name(resource_type, resource_name):
@@ -62,17 +62,53 @@ def find_resource_by_name(resource_type, resource_name):
             return r
     return None
 
-#main functions
-def make_request(resource_type, data):
-    #currently creates request and doesn't check if availability or condition
+
+#checks for clashing reservations
+def check_availability(resource_type, resource_id, start_time, end_time, reservation_date):
+    if not isinstance(start_time, time) and not isinstance(end_time, time):
+        raise ValueError("Invalid Time Format")
+
+    all_reservations = data_access.get_all_records("reservation")
+
+    for reservation in all_reservations:
+        reservation_start = datetime.strptime(reservation.get("start_time"), "%H:%M").time()
+        reservation_end = datetime.strptime(reservation.get("end_time"), "%H:%M").time()
+
+        if(reservation.get("resource_type") == resource_type and
+           reservation.get("resource_id") == resource_id and
+           reservation.get("reservation_date") == reservation_date and
+           reservation_start <= end_time and
+           reservation_end >= start_time and
+           reservation.get("status") == ReservationStatus.APPROVED.value):
+            
+            return False
+
+    return True
+
+#checks if time is during operating hours
+def check_valid_time(start_time, end_time):
+    if start_time < OPEN_TIME or end_time > CLOSE_TIME:
+        return False
+    
+    return True
+
+#changes reservation statuses
+def change_status(reservation, status):
+    if status not in RESERVATION_STATUS:
+        raise ValueError("Invalid Status")
+
+    reservation["status"] = status
+    return reservation
+
+
+#main functions for reservation
+def make_reservation(resource_type, data):
     model = RESOURCE_TYPES.get(resource_type)
     allowed_fields = EDITABLE_FIELDS.get(model)
 
-    #checks if resource type exists
     if model is None:
         raise ValueError("Invalid resource type")
 
-    #checks data
     if not isinstance(data, dict) or not data:
         raise ValueError("Invalid reservation data")
     
@@ -81,28 +117,52 @@ def make_request(resource_type, data):
         raise ValueError(f"Unnecesary fields entered: {sorted(unexpected_fields)}")
 
     #checks if resource exists
-    resource = find_resource_by_name(resource_type, data["name"])
+    resource = find_resource_by_name(resource_type, data.get("name"))
     if resource is None:
         raise ValueError("Resource not found")
 
-    reservation = model(**data)
-    return data_access.create("request", reservation.to_dict()) 
+    #checks resource condition and status check
+    condition = resource.get("condition")
+    status = resource.get("status")
+    if not status in RESOURCE_STATUS:
+        raise ValueError("Invalid Resource Status")
 
+    if not condition in RESOURCE_CONDITION:
+        raise ValueError("Invalid Resource Condition")
 
-def set_book_return(book_id, date_returned):
-    if not isinstance(date_returned, date):
-        raise ValueError("Not a valid date")
+    if condition != ResourceCondition.GOOD.value:
+        return "Resource is in Bad Condition"
+
+    if status == ResourceStatus.RESERVED.value:
+        return "Resource is Reserved"
     
-    book = data_access.get_record(Book, book_id)
-    book["return date"] = date_returned
+    #operating hours check
+    start_time = data["start_time"]
+    end_time = data["end_time"]
+    start_time = datetime.strptime(start_time, "%H:%M").time()
+    end_time = datetime.strptime(end_time, "%H:%M").time()
 
-def request_management():
-    pass
+    if not check_valid_time(start_time, end_time):
+        return "Time is outside of Operating Hours"
 
-def set_status():
-    pass
+    #availability
+    resource_id = resource.get("resource_id")
+    if not check_availability(resource_type, resource_id, start_time, end_time, data["date"]):
+        return "Resource is not Available at Selected Time."
 
-def cancel_request(reservation_type, reservation_id):
+    reservation = model(**data)
+    change_status(reservation, ReservationStatus.PENDING.value)
+    return data_access.create("reservation", reservation.to_dict()) 
+
+
+def book_return_date(reservation_id, date_returned): #logs book return date
+    reservation = data_access.get_record("reservation", reservation_id)
+    reservation["actual_return_date"] = date_returned
+
+    return data_access.update("reservation", reservation_id, reservation)
+
+
+def cancel_reservation(reservation_type, reservation_id):
     if reservation_type not in RESERVATION_TYPES:
         raise ValueError("Invalid Reservation Type")
 
@@ -110,4 +170,35 @@ def cancel_request(reservation_type, reservation_id):
     if record is None:
         return None
 
-    return data_access.delete(reservation_type, reservation_id)
+    reservation = change_status(data_access.get_record("reservation"), ReservationStatus.CANCELLED.value)
+    return data_access.update("reservation", reservation_id, reservation)
+
+
+def accept_deny_reservation(reservation_id, status):
+    reservation = data_access.get_record(reservation_id)
+    reservation = change_status(reservation, status)
+
+    return data_access.update("reservation", reservation_id, reservation)
+
+
+def list_reservations(reservation_type = None): #lists reservation based on type, same logic as list_available_resource
+    if reservation_types is not None and reservation_types not in RESERVATION_TYPES:
+        raise ValueError("Invalid Reservation Types")
+
+    if reservation_type == None:
+        reservation_types = RESERVATION_TYPES #all types
+    else:
+        reservation_types = [reservation_type] #specific types
+
+    available = []
+    
+    for type in reservation_types:
+        records = data_access.get_all_records(type)
+        available.extend(
+            record
+            for record in records
+            if record.get("status") == ResourceStatus.AVAILABLE.value
+            and record.get("condition") == ResourceCondition.GOOD.value
+        )
+    
+    return available
