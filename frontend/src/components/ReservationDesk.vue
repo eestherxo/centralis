@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { get, post } from '../api'
 
 const props = defineProps({ session: { type: Object, required: true } })
-const RECENT_RESERVATIONS_KEY = 'centralis-recent-reservations'
 const isAdmin = computed(() => props.session.user.role === 'admin')
 const reservationTypes = [
   { value: 'room', label: 'Room' },
@@ -49,14 +48,6 @@ async function loadReservations() {
       return
     }
     reservations.value = result.data.records || []
-    // The visitor desk keeps a local snapshot. Reconcile it with the latest
-    // authoritative statuses so staff sessions in another tab stay current.
-    const latestById = new Map(reservations.value.map((item) => [String(item.id), item]))
-    const recent = readRecentRequests().map((item) => {
-      const latest = latestById.get(String(item.id))
-      return latest ? { ...item, ...latest } : item
-    })
-    writeRecentRequests(recent)
   } catch (requestError) {
     error.value = requestError.message || 'Could not reach the server.'
   } finally {
@@ -64,25 +55,15 @@ async function loadReservations() {
   }
 }
 
-function readRecentRequests() {
+async function loadStaffRequests() {
+  if (isAdmin.value) return
   try {
-    const stored = localStorage.getItem(RECENT_RESERVATIONS_KEY)
-    if (stored) return JSON.parse(stored)
-    // Carry forward requests saved by earlier frontend versions.
-    const legacy = JSON.parse(sessionStorage.getItem(RECENT_RESERVATIONS_KEY) || '[]')
-    if (legacy.length) localStorage.setItem(RECENT_RESERVATIONS_KEY, JSON.stringify(legacy))
-    return legacy
-  } catch { return [] }
-}
-
-function writeRecentRequests(items) {
-  localStorage.setItem(RECENT_RESERVATIONS_KEY, JSON.stringify(items))
-  recentRequests.value = items
-}
-
-function syncRecentRequestStatuses(event) {
-  if (isAdmin.value || (event && event.key !== RECENT_RESERVATIONS_KEY)) return
-  recentRequests.value = readRecentRequests()
+    const result = await get('/reservations', props.session.token)
+    if (result.ok) recentRequests.value = result.data.records || []
+    else error.value = result.data.error || 'Could not load reservation requests.'
+  } catch (requestError) {
+    error.value = requestError.message || 'Could not reach the server.'
+  }
 }
 
 async function submitRequest() {
@@ -105,14 +86,9 @@ async function submitRequest() {
       return
     }
     notice.value = `Reservation request #${result.data.reservation.id} was submitted for administrator review.`
-    const recent = {
-      ...result.data.reservation,
-      visitor_name: result.data.visitor.name,
-      resource_name: result.data.resource.name,
-    }
-    writeRecentRequests([...recentRequests.value.filter((item) => String(item.id) !== String(recent.id)), recent].slice(-20))
     form.visitor_id = ''
     if (isAdmin.value) await loadReservations()
+    else await loadStaffRequests()
   } catch (requestError) {
     error.value = requestError.message || 'Could not reach the server.'
   } finally {
@@ -157,9 +133,7 @@ async function updateExisting() {
     notice.value = actionForm.action === 'return'
       ? `Book reservation #${id} marked as returned.`
       : `Reservation #${id} cancelled.`
-    writeRecentRequests(recentRequests.value.map((item) => String(item.id) === String(id)
-      ? { ...item, status: actionForm.action === 'return' ? 'returned' : 'cancelled', actual_return: body.actual_return }
-      : item))
+    await loadStaffRequests()
     actionForm.id = ''
   } catch (requestError) {
     error.value = requestError.message || 'Could not reach the server.'
@@ -167,16 +141,25 @@ async function updateExisting() {
 }
 
 watch(() => form.type, loadResources)
+let staffRefreshTimer
+function refreshStaffRequests() {
+  loadStaffRequests()
+}
 onMounted(() => {
   loadResources()
-  loadReservations()
-  if (!isAdmin.value) {
-    recentRequests.value = readRecentRequests()
-    window.addEventListener('storage', syncRecentRequestStatuses)
+  if (isAdmin.value) {
+    loadReservations()
+  } else {
+    loadStaffRequests()
+    window.addEventListener('focus', refreshStaffRequests)
+    staffRefreshTimer = window.setInterval(loadStaffRequests, 15000)
   }
 })
 
-onBeforeUnmount(() => window.removeEventListener('storage', syncRecentRequestStatuses))
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', refreshStaffRequests)
+  window.clearInterval(staffRefreshTimer)
+})
 </script>
 
 <template>
@@ -197,7 +180,7 @@ onBeforeUnmount(() => window.removeEventListener('storage', syncRecentRequestSta
   </div>
   <div v-else class="ops-grid">
     <section v-if="recentRequests.length" class="ops-card ops-span">
-      <div class="section-heading"><div><h2>Requests from the visitor desk</h2><p class="sub">Reservation requests submitted by this staff session.</p></div></div>
+      <div class="section-heading"><div><h2>Requests from the visitor desk</h2><p class="sub">Reservation requests saved in the system.</p></div></div>
       <div class="table-wrap ops-table-wrap"><table>
         <thead><tr><th>Request</th><th>Visitor</th><th>Resource</th><th>Requested</th><th>Status</th></tr></thead>
         <tbody><tr v-for="item in [...recentRequests].reverse()" :key="item.id">

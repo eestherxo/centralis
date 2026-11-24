@@ -3,6 +3,7 @@ from datetime import date, datetime, time
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
+from app import data_access
 from app.models import Role
 from app.modules import authentication
 from app.modules.resource_reservation import (
@@ -42,6 +43,36 @@ def _json_compatible(value):
 def _service_response(result):
     payload, status = result
     return jsonify(_json_compatible(payload)), status
+
+
+@reservations_bp.get("")
+@jwt_required()
+def list_staff_reservations():
+    staff = _current_user()
+    if staff is None:
+        return {"error": "User account not found."}, 401
+    if staff.get("role") != Role.STAFF.value:
+        return {"error": "Only staff can view reservation requests."}, 403
+
+    records = []
+    for reservation in data_access.get_all_records("reservation"):
+        visitor = data_access.get_record("visitor", reservation.get("visitor_id")) or {}
+        resource = data_access.get_record(
+            reservation.get("reservation_type"), reservation.get("resource_id")
+        ) or {}
+        records.append({
+            key: reservation.get(key)
+            for key in (
+                "id", "visitor_id", "resource_id", "reservation_type",
+                "request_date", "reserve_date", "start_time", "end_time",
+                "expected_return", "actual_return", "occupants", "status",
+            )
+        })
+        records[-1]["visitor_name"] = visitor.get("name")
+        records[-1]["resource_name"] = resource.get("name")
+
+    records.sort(key=lambda item: item.get("id") or 0)
+    return jsonify({"records": records}), 200
 
 
 @reservations_bp.post("/<reservation_type>")

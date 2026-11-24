@@ -105,6 +105,24 @@ def test_staff_can_cancel_future_room_request(client, setup_records):
     assert response.json["status"] == "cancelled"
 
 
+def test_staff_reservation_list_comes_from_persisted_records(client, setup_records):
+    visitor, room, _ = setup_records
+    staff, admin = headers(client, "staff"), headers(client, "admin")
+    created = room_request(client, staff, visitor, room)
+
+    listed = client.get("/reservations", headers=staff)
+    denied = client.get("/reservations", headers=admin)
+    anonymous = client.get("/reservations")
+
+    assert listed.status_code == 200
+    assert listed.json["records"][0]["id"] == created.json["reservation"]["id"]
+    assert listed.json["records"][0]["visitor_name"] == visitor["name"]
+    assert listed.json["records"][0]["resource_name"] == room["name"]
+    assert listed.json["records"][0]["status"] == "pending"
+    assert denied.status_code == 403
+    assert anonymous.status_code == 401
+
+
 def test_staff_records_book_return(client, setup_records):
     visitor, _, book = setup_records
     staff, admin = headers(client, "staff"), headers(client, "admin")
