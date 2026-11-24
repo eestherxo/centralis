@@ -1,6 +1,6 @@
 <script setup>
 import { reactive, ref } from 'vue'
-import { post } from '../api'
+import { apiUrl, post } from '../api'
 
 const props = defineProps({ session: { type: Object, required: true } })
 
@@ -40,7 +40,7 @@ async function exportReport() {
   error.value = ''
   busy.value = true
   try {
-    const response = await fetch('/reports/export', {
+    const response = await fetch(apiUrl('/reports/export'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${props.session.token}` },
       body: JSON.stringify(form),

@@ -1,9 +1,15 @@
+export function apiUrl(path) {
+  // Vercel serves the frontend and proxies /api/* to the separately hosted
+  // Flask service. Local Vite development continues using its /path proxies.
+  return import.meta.env.PROD ? `/api${path}` : path
+}
+
 export async function request(url, { method = 'GET', body, token } = {}) {
   const headers = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(url, {
+  const res = await fetch(apiUrl(url), {
     method,
     headers,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

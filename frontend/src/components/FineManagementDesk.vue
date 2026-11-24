@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { get, post } from '../api'
+import { apiUrl, get, post } from '../api'
 
 const props = defineProps({ session: { type: Object, required: true } })
 const loans = ref([])
@@ -120,7 +120,7 @@ async function confirmPayment(fine) {
 async function downloadReceipt(fine) {
   error.value = ''
   try {
-    const response = await fetch(`/fines/${fine.id}/receipt`, {
+    const response = await fetch(apiUrl(`/fines/${fine.id}/receipt`), {
       headers: { Authorization: `Bearer ${props.session.token}` },
     })
     if (!response.ok) {
