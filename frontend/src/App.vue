@@ -1,47 +1,66 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import RegisterForm from './components/RegisterForm.vue'
-import CheckForm from './components/CheckForm.vue'
 import AdminLogin from './components/AdminLogin.vue'
 import AdminDashboard from './components/AdminDashboard.vue'
 
-const tab = ref('register')
-const prefill = ref(null)
 const page = ref('visitor')
 const adminSession = ref(null)
 
-function onExists(payload) {
-  prefill.value = payload
-  tab.value = 'check'
+function isAdminHash() {
+  return window.location.hash === '#admin'
+}
+
+function showVisitor() {
+  if (window.location.hash === '#admin') {
+    history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+  }
+  page.value = 'visitor'
+}
+
+function syncPageFromLocation() {
+  if (adminSession.value) {
+    if (!isAdminHash()) window.location.hash = 'admin'
+    page.value = 'dashboard'
+    return
+  }
+  page.value = isAdminHash() ? 'admin-login' : 'visitor'
 }
 
 function onAuthenticated(session) {
   adminSession.value = session
   sessionStorage.setItem('centralis-admin-session', JSON.stringify(session))
-  page.value = session.user.role === 'staff' ? 'visitor' : 'dashboard'
+  if (!isAdminHash()) window.location.hash = 'admin'
+  page.value = 'dashboard'
 }
 
 function signOut() {
   sessionStorage.removeItem('centralis-admin-session')
   adminSession.value = null
-  page.value = 'visitor'
+  showVisitor()
 }
 
 onMounted(() => {
   const savedSession = sessionStorage.getItem('centralis-admin-session')
-  if (!savedSession) return
-
-  try {
-    const session = JSON.parse(savedSession)
-    if (session?.token && ['admin', 'staff'].includes(session?.user?.role)) {
-      adminSession.value = session
-      page.value = session.user.role === 'staff' ? 'visitor' : 'dashboard'
-    } else {
+  if (savedSession) {
+    try {
+      const session = JSON.parse(savedSession)
+      if (session?.token && ['admin', 'staff'].includes(session?.user?.role)) {
+        adminSession.value = session
+      } else {
+        sessionStorage.removeItem('centralis-admin-session')
+      }
+    } catch {
       sessionStorage.removeItem('centralis-admin-session')
     }
-  } catch {
-    sessionStorage.removeItem('centralis-admin-session')
   }
+
+  syncPageFromLocation()
+  window.addEventListener('hashchange', syncPageFromLocation)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('hashchange', syncPageFromLocation)
 })
 </script>
 
@@ -49,7 +68,7 @@ onMounted(() => {
   <AdminLogin
     v-if="page === 'admin-login'"
     @authenticated="onAuthenticated"
-    @back="page = 'visitor'"
+    @back="showVisitor"
   />
   <AdminDashboard
     v-else-if="page === 'dashboard' && adminSession"
@@ -62,7 +81,7 @@ onMounted(() => {
       <div class="campus-caption">
         <span>SALISES · UWI</span>
         <p>Welcome to the visitor centre</p>
-        <small>Register your visit or check in with your visitor ID.</small>
+        <small>Register your visit at the desk.</small>
       </div>
     </section>
 
@@ -71,31 +90,14 @@ onMounted(() => {
         <img class="brand-logo" src="/salises-logo.jpg" alt="SALISES - The University of the West Indies" />
       </header>
 
-      <div v-if="adminSession?.user?.role === 'staff'" class="staff-mode-bar">
-        <span>Staff assisted check-in · {{ adminSession.user.name }}</span>
-        <div>
-          <button class="text-button" type="button" @click="page = 'dashboard'">Open dashboard</button>
-          <button class="text-button" type="button" @click="signOut">Sign out</button>
-        </div>
-      </div>
-
       <div class="form-content">
         <div class="heading">
           <p class="eyebrow">Visitor Centre</p>
-          <h1>{{ tab === 'register' ? 'Visitor registration' : 'Returning visitor' }}</h1>
-          <p class="sub">{{ tab === 'register' ? 'Complete the form to register and check in' : 'Use your visitor ID to check in or check out' }}</p>
+          <h1>Visitor registration</h1>
+          <p class="sub">Complete the form to register and check in</p>
         </div>
 
-        <div class="tabs" aria-label="Visitor actions">
-          <button :class="{ active: tab === 'register' }" @click="tab = 'register'">New visitor</button>
-          <button :class="{ active: tab === 'check' }" @click="tab = 'check'">Returning visitor</button>
-        </div>
-
-        <RegisterForm v-if="tab === 'register'" :session="adminSession" @exists="onExists" />
-        <CheckForm v-else :prefill="prefill" :session="adminSession" />
-        <button v-if="!adminSession" class="text-button admin-entry" type="button" @click="page = 'admin-login'">
-          Staff and administrator sign in
-        </button>
+        <RegisterForm />
       </div>
     </section>
   </main>

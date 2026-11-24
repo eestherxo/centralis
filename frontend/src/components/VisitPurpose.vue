@@ -6,6 +6,7 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   staffAuthenticated: { type: Boolean, default: false },
   initialReservation: { type: Object, default: null },
+  simple: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -78,6 +79,7 @@ watch([reason, reservationType, reservation], () => {
 
 function validate() {
   validationError.value = ''
+  if (props.simple) return true
   if (reason.value !== 'reservation') return true
   if (!props.staffAuthenticated) {
     validationError.value = 'A SALISES staff member must sign in before submitting a reservation.'
@@ -107,7 +109,7 @@ function validate() {
 }
 
 function getReservationData() {
-  if (reason.value !== 'reservation') return null
+  if (props.simple || reason.value !== 'reservation') return null
   const data = { type: reservationType.value, resource_id: Number(reservation.resource_id) }
   if (reservationType.value === 'book') data.expected_return = reservation.expected_return
   else Object.assign(data, {
@@ -152,6 +154,10 @@ async function loadResources() {
 
 watch(reservationType, loadResources)
 onMounted(async () => {
+  if (props.simple) {
+    hydrating = false
+    return
+  }
   if (props.initialReservation) {
     reason.value = 'reservation'
     reservationType.value = props.initialReservation.type || 'room'
@@ -170,71 +176,85 @@ onMounted(async () => {
 
 <template>
   <div class="visit-purpose">
-    <label>Reason for visit
-      <select v-model="reason">
-        <option v-for="item in reasons" :key="item.value" :value="item.value">{{ item.label }}</option>
-      </select>
-    </label>
-
-    <template v-if="reason === 'reservation'">
-      <div class="reservation-intake">
-        <p class="reservation-intake-title">Reservation details</p>
-        <label>What would you like to reserve?
-          <select v-model="reservationType">
-            <option v-for="item in reservationTypes" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </option>
-          </select>
-        </label>
-
-        <label v-if="resources.length">Available resource
-          <select v-model="reservation.resource_id" required>
-            <option value="" disabled>{{ resourceLoading ? 'Loading resources…' : 'Choose a resource' }}</option>
-            <option v-for="resource in resources" :key="resource.id" :value="String(resource.id)">
-              {{ resource.name }}
-            </option>
-          </select>
-        </label>
-        <label v-else>Available resource ID
-          <input v-model="reservation.resource_id" type="number" min="1" step="1" required placeholder="Enter the resource ID" />
-        </label>
-
-        <template v-if="reservationType === 'book'">
-          <label>Expected return date
-            <input v-model="reservation.expected_return" type="date" :min="minDate" required />
-          </label>
-        </template>
-        <template v-else>
-          <label>Reservation date
-            <input v-model="reservation.reserve_date" type="date" :min="minDate" required />
-          </label>
-          <div class="row">
-            <label>Start time
-              <input v-model="reservation.start_time" type="time" min="08:30" max="16:30" required />
-            </label>
-            <label>End time
-              <input v-model="reservation.end_time" type="time" min="08:30" max="16:30" required />
-            </label>
-          </div>
-          <label v-if="reservationType === 'room'">Number of occupants
-            <input v-model="reservation.occupants" type="number" min="1" step="1" required />
-          </label>
-        </template>
-
-        <label>Additional details <small>(optional)</small>
-          <textarea v-model="details" rows="2" maxlength="500" placeholder="Anything staff should know?" />
-        </label>
-        <p class="reservation-note">
-          A staff member will submit this request for the visitor. It remains pending until an administrator reviews it.
-        </p>
-        <p v-if="validationError" class="err purpose-error" role="alert">{{ validationError }}</p>
-      </div>
+    <template v-if="simple">
+      <label>Reason for visit
+        <input
+          :value="modelValue"
+          type="text"
+          maxlength="200"
+          required
+          placeholder="e.g. Research"
+          @input="emit('update:modelValue', $event.target.value)"
+        />
+      </label>
     </template>
-    <label v-else-if="reason === 'other'">What are you visiting for?
-      <textarea v-model="details" rows="2" maxlength="500" required placeholder="Tell us the reason for your visit" />
-    </label>
-    <label v-else>Additional details <small>(optional)</small>
-      <input v-model="details" maxlength="200" placeholder="Add a little more detail" />
-    </label>
+    <template v-else>
+      <label>Reason for visit
+        <select v-model="reason">
+          <option v-for="item in reasons" :key="item.value" :value="item.value">{{ item.label }}</option>
+        </select>
+      </label>
+
+      <template v-if="reason === 'reservation'">
+        <div class="reservation-intake">
+          <p class="reservation-intake-title">Reservation details</p>
+          <label>What would you like to reserve?
+            <select v-model="reservationType">
+              <option v-for="item in reservationTypes" :key="item.value" :value="item.value">
+                {{ item.label }}
+              </option>
+            </select>
+          </label>
+
+          <label v-if="resources.length">Available resource
+            <select v-model="reservation.resource_id" required>
+              <option value="" disabled>{{ resourceLoading ? 'Loading resources…' : 'Choose a resource' }}</option>
+              <option v-for="resource in resources" :key="resource.id" :value="String(resource.id)">
+                {{ resource.name }}
+              </option>
+            </select>
+          </label>
+          <label v-else>Available resource ID
+            <input v-model="reservation.resource_id" type="number" min="1" step="1" required placeholder="Enter the resource ID" />
+          </label>
+
+          <template v-if="reservationType === 'book'">
+            <label>Expected return date
+              <input v-model="reservation.expected_return" type="date" :min="minDate" required />
+            </label>
+          </template>
+          <template v-else>
+            <label>Reservation date
+              <input v-model="reservation.reserve_date" type="date" :min="minDate" required />
+            </label>
+            <div class="row">
+              <label>Start time
+                <input v-model="reservation.start_time" type="time" min="08:30" max="16:30" required />
+              </label>
+              <label>End time
+                <input v-model="reservation.end_time" type="time" min="08:30" max="16:30" required />
+              </label>
+            </div>
+            <label v-if="reservationType === 'room'">Number of occupants
+              <input v-model="reservation.occupants" type="number" min="1" step="1" required />
+            </label>
+          </template>
+
+          <label>Additional details <small>(optional)</small>
+            <textarea v-model="details" rows="2" maxlength="500" placeholder="Anything staff should know?" />
+          </label>
+          <p class="reservation-note">
+            A staff member will submit this request for the visitor. It remains pending until an administrator reviews it.
+          </p>
+          <p v-if="validationError" class="err purpose-error" role="alert">{{ validationError }}</p>
+        </div>
+      </template>
+      <label v-else-if="reason === 'other'">What are you visiting for?
+        <textarea v-model="details" rows="2" maxlength="500" required placeholder="Tell us the reason for your visit" />
+      </label>
+      <label v-else>Additional details <small>(optional)</small>
+        <input v-model="details" maxlength="200" placeholder="Add a little more detail" />
+      </label>
+    </template>
   </div>
 </template>

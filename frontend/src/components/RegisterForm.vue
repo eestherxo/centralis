@@ -1,28 +1,29 @@
 <script setup>
 import { reactive, ref } from 'vue'
-import { post, fmt } from '../api'
+import { post } from '../api'
 import VisitPurpose from './VisitPurpose.vue'
 
-const emit = defineEmits(['exists'])
-const props = defineProps({ session: { type: Object, default: null } })
 const blank = () => ({
   type: 'undergraduate', name: '', phone_number: '',
   student_id: '', faculty: '', purpose: '',
 })
 const form = reactive(blank())
 const errors = ref({})
-const banner = ref(null)
+const modal = ref(null)
 const busy = ref(false)
 const formElement = ref(null)
 const purposeForm = ref(null)
 
 const isStudent = () => form.type !== 'external'
 
+function dismissModal() {
+  modal.value = null
+}
+
 async function submit() {
   errors.value = {}
-  banner.value = null
+  modal.value = null
   if (purposeForm.value?.validate() === false || !formElement.value?.reportValidity()) return
-  const reservationRequest = purposeForm.value?.getReservationData()
 
   const body = {
     type: form.type,
@@ -39,53 +40,32 @@ async function submit() {
   try {
     const { ok, status, data } = await post('/visitors/register', body)
     if (ok) {
-      let reservationConfirmation = ''
-      if (reservationRequest) {
-        let result
-        try {
-          result = await post(`/reservations/${reservationRequest.type}`, {
-            ...reservationRequest,
-            visitor_id: data.visitor.id,
-          }, props.session.token)
-        } catch (reservationError) {
-          banner.value = {
-            ok: false,
-            text: `The visitor was registered and checked in, but the reservation request could not be submitted: ${reservationError.message || 'Please try again.'}`,
-          }
-          Object.assign(form, blank())
-          return
-        }
-        if (!result.ok) {
-          banner.value = {
-            ok: false,
-            text: `The visitor was registered and checked in, but the reservation request could not be submitted: ${result.data.error || 'Please try again.'}`,
-          }
-          Object.assign(form, blank())
-          return
-        }
-        reservationConfirmation = ` Reservation request #${result.data.reservation.id} was submitted for administrator review.`
-        const recent = JSON.parse(sessionStorage.getItem('centralis-recent-reservations') || '[]')
-        recent.push({ ...result.data.reservation, visitor_name: data.visitor.name, resource_name: result.data.resource.name })
-        sessionStorage.setItem('centralis-recent-reservations', JSON.stringify(recent.slice(-20)))
-      }
-      banner.value = {
+      modal.value = {
         ok: true,
-        text: `${data.message} Checked in at ${fmt(data.visit.check_in)}. Your visitor ID is ${data.visitor.id}; use it for future visits.${reservationConfirmation}`,
+        title: 'Registration complete',
+        visitorId: data.visitor.id,
       }
       Object.assign(form, blank())
     } else if (status === 409) {
-      emit('exists', {
-        student_id: body.student_id || '',
-        purpose: body.purpose,
-        reservationRequest,
-        message: data.error,
-      })
+      modal.value = {
+        ok: false,
+        title: 'Registration failed',
+        text: data.error || 'This visitor is already registered. Ask staff to check you in with your visitor ID.',
+      }
     } else {
       errors.value = data.fields || {}
-      banner.value = { ok: false, text: data.error || 'Registration failed.' }
+      modal.value = {
+        ok: false,
+        title: 'Registration failed',
+        text: data.error || 'Registration failed.',
+      }
     }
   } catch {
-    banner.value = { ok: false, text: 'Could not reach the server.' }
+    modal.value = {
+      ok: false,
+      title: 'Registration failed',
+      text: 'Could not reach the server.',
+    }
   } finally {
     busy.value = false
   }
@@ -132,11 +112,32 @@ async function submit() {
       <span class="err">{{ errors.faculty }}</span>
     </label>
 
-    <VisitPurpose ref="purposeForm" v-model="form.purpose"
-      :staff-authenticated="session?.user?.role === 'staff'" />
+    <VisitPurpose ref="purposeForm" v-model="form.purpose" simple />
     <span class="err">{{ errors.purpose }}</span>
 
     <button class="btn" type="submit" :disabled="busy">Register and check in</button>
-    <div v-if="banner" class="banner" :class="banner.ok ? 'ok' : 'bad'">{{ banner.text }}</div>
   </form>
+
+  <div
+    v-if="modal"
+    class="modal-backdrop"
+    role="presentation"
+    @click.self="dismissModal"
+  >
+    <div
+      class="modal-dialog"
+      :class="modal.ok ? 'ok' : 'bad'"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="modal.ok ? 'registration-confirm-title' : 'registration-error-title'"
+    >
+      <h2 :id="modal.ok ? 'registration-confirm-title' : 'registration-error-title'">{{ modal.title }}</h2>
+      <p v-if="modal.ok">
+        Visitor registered and checked in successfully. Your visitor ID is
+        <strong class="visitor-id">{{ modal.visitorId }}</strong>
+      </p>
+      <p v-else>{{ modal.text }}</p>
+      <button class="btn" type="button" @click="dismissModal">OK</button>
+    </div>
+  </div>
 </template>

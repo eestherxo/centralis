@@ -150,8 +150,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="ops-grid">
-    <section v-if="!isAdmin && recentRequests.length" class="ops-card ops-span">
+  <div v-if="isAdmin" class="admin-reservation-desk">
+    <section class="ops-card">
+      <div class="section-heading"><div><h2>Reservation requests</h2><p class="sub">Review pending requests submitted by staff.</p></div><button class="btn ghost refresh-button" type="button" :disabled="loading" @click="loadReservations">{{ loading ? 'Refreshing…' : 'Refresh' }}</button></div>
+      <div v-if="reservations.length" class="table-wrap ops-table-wrap"><table>
+        <thead><tr><th>Request</th><th>Visitor</th><th>Resource</th><th>Requested</th><th>Status</th><th>Review</th></tr></thead>
+        <tbody><tr v-for="item in [...reservations].reverse()" :key="item.id">
+          <td>#{{ item.id }}</td><td>#{{ item.visitor_id }}</td><td>#{{ item.resource_id }}</td><td>{{ item.request_date }}</td><td>{{ item.status }}</td>
+          <td class="table-actions"><template v-if="item.status === 'pending'"><button class="text-button" type="button" @click="reviewRequest(item, 'approve')">Approve</button><button class="text-button danger-link" type="button" @click="reviewRequest(item, 'decline')">Decline</button></template><span v-else>—</span></td>
+        </tr></tbody>
+      </table></div>
+      <p v-else-if="!loading" class="empty-state">No reservation requests found for the report period.</p>
+      <p v-if="error" class="banner bad" role="alert">{{ error }}</p>
+      <p v-if="notice" class="banner ok" role="status">{{ notice }}</p>
+    </section>
+  </div>
+  <div v-else class="ops-grid">
+    <section v-if="recentRequests.length" class="ops-card ops-span">
       <div class="section-heading"><div><h2>Requests from the visitor desk</h2><p class="sub">Reservation requests submitted by this staff session.</p></div></div>
       <div class="table-wrap ops-table-wrap"><table>
         <thead><tr><th>Request</th><th>Visitor</th><th>Resource</th><th>Requested</th><th>Status</th></tr></thead>
@@ -160,7 +175,7 @@ onMounted(() => {
         </tr></tbody>
       </table></div>
     </section>
-    <section v-if="!isAdmin" class="ops-card">
+    <section class="ops-card">
       <div class="section-heading"><div><h2>Submit a resource request</h2><p class="sub">Requests are sent to an administrator for approval.</p></div></div>
       <form class="ops-form reservation-form" @submit.prevent="submitRequest">
         <label>Reservation type
@@ -186,7 +201,7 @@ onMounted(() => {
       </form>
     </section>
 
-    <section v-if="!isAdmin" class="ops-card">
+    <section class="ops-card">
       <div class="section-heading"><div><h2>Update a request</h2><p class="sub">Use the reservation ID shown when the request was submitted.</p></div></div>
       <form class="ops-form" @submit.prevent="updateExisting">
         <label>Reservation ID<input v-model="actionForm.id" type="number" min="1" step="1" required /></label>
@@ -194,18 +209,6 @@ onMounted(() => {
         <label v-if="actionForm.action === 'return'">Actual return date<input v-model="actionForm.actual_return" type="date" required /></label>
         <button class="btn" type="submit">{{ actionForm.action === 'return' ? 'Record return' : 'Cancel request' }}</button>
       </form>
-    </section>
-
-    <section v-else class="ops-card">
-      <div class="section-heading"><div><h2>Reservation requests</h2><p class="sub">Review pending requests submitted by staff.</p></div><button class="btn ghost refresh-button" type="button" :disabled="loading" @click="loadReservations">{{ loading ? 'Refreshing…' : 'Refresh' }}</button></div>
-      <div v-if="reservations.length" class="table-wrap ops-table-wrap"><table>
-        <thead><tr><th>Request</th><th>Visitor</th><th>Resource</th><th>Requested</th><th>Status</th><th>Review</th></tr></thead>
-        <tbody><tr v-for="item in [...reservations].reverse()" :key="item.id">
-          <td>#{{ item.id }}</td><td>#{{ item.visitor_id }}</td><td>#{{ item.resource_id }}</td><td>{{ item.request_date }}</td><td>{{ item.status }}</td>
-          <td class="table-actions"><template v-if="item.status === 'pending'"><button class="text-button" type="button" @click="reviewRequest(item, 'approve')">Approve</button><button class="text-button danger-link" type="button" @click="reviewRequest(item, 'decline')">Decline</button></template><span v-else>—</span></td>
-        </tr></tbody>
-      </table></div>
-      <p v-else-if="!loading" class="empty-state">No reservation requests found for the report period.</p>
     </section>
     <p v-if="error" class="banner bad ops-notice" role="alert">{{ error }}</p>
     <p v-if="notice" class="banner ok ops-notice" role="status">{{ notice }}</p>

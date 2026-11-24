@@ -5,22 +5,23 @@ import ReservationDesk from './ReservationDesk.vue'
 import SalesDesk from './SalesDesk.vue'
 import ReportsDesk from './ReportsDesk.vue'
 import UserAccountsDesk from './UserAccountsDesk.vue'
+import VisitorDesk from './VisitorDesk.vue'
 
 const props = defineProps({
   session: { type: Object, required: true },
 })
 const emit = defineEmits(['sign-out'])
 const isAdmin = computed(() => props.session.user.role === 'admin')
-const activePanel = ref(isAdmin.value ? 'inventory' : 'reservations')
+const activePanel = ref(isAdmin.value ? 'inventory' : 'visitors')
 const panels = computed(() => isAdmin.value
   ? [
       { id: 'inventory', label: 'Inventory' },
       { id: 'reservations', label: 'Reservations' },
-      { id: 'sales', label: 'Journal sales' },
       { id: 'reports', label: 'Reports' },
       { id: 'accounts', label: 'Staff accounts' },
     ]
   : [
+      { id: 'visitors', label: 'Visitors' },
       { id: 'reservations', label: 'Reservations' },
       { id: 'sales', label: 'Journal sales' },
     ])
@@ -39,7 +40,8 @@ const editing = ref(false)
 const error = ref('')
 const notice = ref('')
 const search = ref('')
-const statusForm = reactive({ resource_type: 'book', id: '', status: 'reserved', condition: 'good' })
+const pendingDelete = ref(null)
+const deleting = ref(false)
 const form = reactive({
   id: null,
   resource_type: 'book',
@@ -213,45 +215,22 @@ async function saveResource() {
   }
 }
 
-async function updateResourceStatus() {
-  error.value = ''
-  notice.value = ''
-  const resourceId = Number(statusForm.id)
-  if (!Number.isSafeInteger(resourceId) || resourceId <= 0) {
-    error.value = 'Enter a valid resource ID.'
-    return
-  }
-  try {
-    const result = await put(
-      `/inventory/${statusForm.resource_type}/${resourceId}`,
-      { data: { status: statusForm.status, condition: statusForm.condition } },
-      props.session.token,
-    )
-    if (!result.ok) {
-      error.value = result.data.error || 'Could not update this resource.'
-      return
-    }
-    const resource = result.data[statusForm.resource_type]
-    if (resource?.status === 'available' && resource?.condition === 'good') {
-      const index = resources.value.findIndex((item) => item.resource_type === resource.resource_type && item.id === resource.id)
-      if (index === -1) resources.value.unshift(resource)
-      else resources.value.splice(index, 1, resource)
-    } else {
-      resources.value = resources.value.filter((item) => !(item.resource_type === statusForm.resource_type && item.id === resourceId))
-    }
-    notice.value = `${resource?.name || `Resource #${resourceId}`} status and condition updated.`
-    statusForm.id = ''
-  } catch (requestError) {
-    error.value = requestError.message || 'Could not reach the server.'
-  }
+function requestDelete(resource) {
+  pendingDelete.value = resource
 }
 
-async function deleteResource(resource) {
-  const label = `${resource.name} (ID ${resource.id})`
-  if (!window.confirm(`Delete ${label}? This action cannot be undone.`)) return
+function cancelDelete() {
+  if (deleting.value) return
+  pendingDelete.value = null
+}
+
+async function confirmDelete() {
+  const resource = pendingDelete.value
+  if (!resource) return
 
   error.value = ''
   notice.value = ''
+  deleting.value = true
   try {
     const { ok, status, data } = await remove(
       `/inventory/${resource.resource_type}/${resource.id}`,
@@ -261,14 +240,19 @@ async function deleteResource(resource) {
       error.value = status === 409
         ? 'This resource has an active reservation and cannot be deleted.'
         : data.error || 'Could not delete this resource.'
+      pendingDelete.value = null
       return
     }
     resources.value = resources.value.filter((item) =>
       !(item.resource_type === resource.resource_type && item.id === resource.id),
     )
     notice.value = 'Resource deleted.'
+    pendingDelete.value = null
   } catch (requestError) {
     error.value = requestError.message || 'Could not reach the server.'
+    pendingDelete.value = null
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -425,7 +409,7 @@ onMounted(() => { if (isAdmin.value) loadInventory() })
                 <td>
                   <div class="table-actions">
                     <button class="text-button" type="button" @click="editResource(resource)">Edit</button>
-                    <button class="text-button danger-link" type="button" @click="deleteResource(resource)">Delete</button>
+                    <button class="text-button danger-link" type="button" @click="requestDelete(resource)">Delete</button>
                   </div>
                 </td>
               </tr>
@@ -433,25 +417,36 @@ onMounted(() => { if (isAdmin.value) loadInventory() })
           </table>
         </div>
       </section>
-
-      <section class="resource-form-card status-lookup-card">
-        <div class="section-heading">
-          <div><h2>Update resource status</h2><p class="sub">Use the resource ID to change its availability or condition.</p></div>
-        </div>
-        <form class="ops-form" @submit.prevent="updateResourceStatus">
-          <label>Resource type<select v-model="statusForm.resource_type"><option v-for="type in resourceTypes" :key="type.value" :value="type.value">{{ type.label }}</option></select></label>
-          <label>Resource ID<input v-model="statusForm.id" type="number" min="1" step="1" required /></label>
-          <label>Status<select v-model="statusForm.status"><option value="available">Available</option><option value="reserved">Reserved</option></select></label>
-          <label>Condition<select v-model="statusForm.condition"><option value="good">Good</option><option value="lost">Lost</option><option value="damaged">Damaged</option></select></label>
-          <button class="btn" type="submit">Save status</button>
-        </form>
-      </section>
       </div>
 
+      <VisitorDesk v-else-if="activePanel === 'visitors'" :session="session" />
       <ReservationDesk v-else-if="activePanel === 'reservations'" :session="session" />
       <SalesDesk v-else-if="activePanel === 'sales'" :session="session" />
       <ReportsDesk v-else-if="activePanel === 'reports'" :session="session" />
       <UserAccountsDesk v-else-if="activePanel === 'accounts'" :session="session" />
     </section>
+
+    <Teleport to="body">
+      <div
+        v-if="pendingDelete"
+        class="modal-backdrop"
+        role="presentation"
+        @click.self="cancelDelete"
+      >
+        <div class="modal-dialog bad" role="dialog" aria-modal="true" aria-labelledby="delete-resource-title">
+          <h2 id="delete-resource-title">Delete resource</h2>
+          <p>
+            Delete <strong>{{ pendingDelete.name }}</strong> (ID {{ pendingDelete.id }})?
+            This action cannot be undone.
+          </p>
+          <div class="modal-actions">
+            <button class="btn ghost" type="button" :disabled="deleting" @click="cancelDelete">Cancel</button>
+            <button class="btn" type="button" :disabled="deleting" @click="confirmDelete">
+              {{ deleting ? 'Deleting…' : 'Delete' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </main>
 </template>

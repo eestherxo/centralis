@@ -328,6 +328,65 @@ tbody tr:hover { background: #faf8f8; }
 .ops-notice { grid-column: 1 / -1; margin: 0; }
 .account-card { max-width: 760px; }
 .account-card .ops-form { grid-template-columns: 1fr 1fr; }
+.visitor-desk {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.visitor-desk .ops-card {
+  width: min(520px, 100%);
+}
+.admin-reservation-desk {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+.admin-reservation-desk .ops-card {
+  width: min(960px, 100%);
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(42, 28, 30, .45);
+}
+.modal-dialog {
+  width: min(420px, 100%);
+  padding: 24px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(42, 28, 30, .22);
+  text-align: center;
+}
+.modal-dialog h2 {
+  margin: 0 0 10px;
+  color: var(--red-dark);
+  font-size: 1.25rem;
+}
+.modal-dialog.bad h2 { color: var(--bad); }
+.modal-dialog p {
+  margin: 0 0 18px;
+  color: var(--ink);
+  font-size: .9rem;
+  line-height: 1.45;
+}
+.modal-dialog .visitor-id {
+  display: inline-block;
+  color: var(--red-dark);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.modal-dialog .btn { width: auto; min-width: 120px; margin-inline: auto; }
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.modal-actions .btn { margin-inline: 0; }
 
 @media (max-width: 850px) {
   body { padding: 18px; }
