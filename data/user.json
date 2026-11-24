@@ -1,0 +1,16 @@
+[
+    {
+        "id": 10000001,
+        "name": "Demo Admin",
+        "email": "admin@salises.test",
+        "password": "$2b$12$3CFbNkvisiiQT.WQRAP1z.rBcFsQ5kBIkbv/PxuCB98k332Rmy8L.",
+        "role": "admin"
+    },
+    {
+        "id": 10000002,
+        "name": "Demo Staff",
+        "email": "staff@salises.test",
+        "password": "$2b$12$xqdiFIL/aYrPlG83nEGx.OANpixkH/TfeW1zBN5GCem.s3bPfaDwK",
+        "role": "staff"
+    }
+]

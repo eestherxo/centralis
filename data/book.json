@@ -1,0 +1,20 @@
+[
+    {
+        "name": "Demo: Caribbean Economic Survey",
+        "author": "SALISES",
+        "price": 4500.0,
+        "genre": "Economics",
+        "status": "reserved",
+        "condition": "good",
+        "id": 29200001
+    },
+    {
+        "name": "Demo: Statistical Digest",
+        "author": "SALISES",
+        "price": 3200.0,
+        "genre": "Research",
+        "status": "available",
+        "condition": "good",
+        "id": 29200002
+    }
+]

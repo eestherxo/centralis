@@ -1,16 +1,26 @@
 [
     {
-        "visitor_id": 19200001,
+        "demo_key": "demo-visit-1",
+        "visitor_id": 19100001,
         "purpose": "Research",
-        "check_in": "2026-11-20T15:21:44.970456+00:00",
-        "check_out": "2026-11-22T05:18:11.851480+00:00",
-        "id": 100000001
+        "check_in": "2026-11-24T09:00:00+00:00",
+        "check_out": null,
+        "id": 99900001
     },
     {
-        "visitor_id": 19200001,
-        "purpose": "Research",
-        "check_in": "2026-11-22T20:27:16.573599+00:00",
-        "check_out": "2026-11-22T20:33:21.558384+00:00",
-        "id": 100000002
+        "demo_key": "demo-visit-2",
+        "visitor_id": 19100002,
+        "purpose": "Consultation",
+        "check_in": "2026-11-23T09:00:00+00:00",
+        "check_out": "2026-11-23T10:00:00+00:00",
+        "id": 99900002
+    },
+    {
+        "demo_key": "demo-visit-3",
+        "visitor_id": 19100003,
+        "purpose": "Seminar",
+        "check_in": "2026-11-22T09:00:00+00:00",
+        "check_out": "2026-11-22T10:00:00+00:00",
+        "id": 99900003
     }
 ]

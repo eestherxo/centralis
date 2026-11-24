@@ -70,15 +70,15 @@ def test_visitor_frequency_and_categories_are_reported(mock_records):
     )
 
     maya = next(
-        record for record in report["records"] if record["visitor_id"] == "V-001"
+        record for record in report["records"] if record["visitor_id"] == 19100001
     )
     categories = {record["type"] for record in report["records"]}
 
     assert maya["visit_frequency"] == 2
     assert categories == {
-        "Undergraduate",
-        "Postgraduate",
-        "Outside Personnel",
+        "undergraduate",
+        "postgraduate",
+        "external",
     }
 
 
