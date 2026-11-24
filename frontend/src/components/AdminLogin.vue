@@ -20,8 +20,8 @@ async function submit() {
       error.value = data.error || 'Sign in failed.'
       return
     }
-    if (data.user?.role !== 'admin' || !data.access_token) {
-      error.value = 'This account does not have administrator access.'
+    if (!['admin', 'staff'].includes(data.user?.role) || !data.access_token) {
+      error.value = 'This account does not have staff or administrator access.'
       return
     }
     emit('authenticated', { token: data.access_token, user: data.user })
@@ -39,9 +39,9 @@ async function submit() {
       <a class="brand-link" href="/" aria-label="SALISES visitor centre">
         <img src="/salises-logo.jpg" alt="SALISES - The University of the West Indies" />
       </a>
-      <p class="eyebrow">Administrator portal</p>
+      <p class="eyebrow">Staff and administrator portal</p>
       <h1>Sign in</h1>
-      <p class="sub">Use your SALISES administrator account to manage resources.</p>
+      <p class="sub">Sign in with your SALISES staff or administrator account.</p>
 
       <form class="admin-form" @submit.prevent="submit">
         <label for="admin-email">Email address</label>

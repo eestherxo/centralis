@@ -1,11 +1,29 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { get, post, put, remove } from '../api'
+import ReservationDesk from './ReservationDesk.vue'
+import SalesDesk from './SalesDesk.vue'
+import ReportsDesk from './ReportsDesk.vue'
+import UserAccountsDesk from './UserAccountsDesk.vue'
 
 const props = defineProps({
   session: { type: Object, required: true },
 })
 const emit = defineEmits(['sign-out'])
+const isAdmin = computed(() => props.session.user.role === 'admin')
+const activePanel = ref(isAdmin.value ? 'inventory' : 'reservations')
+const panels = computed(() => isAdmin.value
+  ? [
+      { id: 'inventory', label: 'Inventory' },
+      { id: 'reservations', label: 'Reservations' },
+      { id: 'sales', label: 'Journal sales' },
+      { id: 'reports', label: 'Reports' },
+      { id: 'accounts', label: 'Staff accounts' },
+    ]
+  : [
+      { id: 'reservations', label: 'Reservations' },
+      { id: 'sales', label: 'Journal sales' },
+    ])
 
 const resourceTypes = [
   { value: 'book', label: 'Book' },
@@ -21,6 +39,7 @@ const editing = ref(false)
 const error = ref('')
 const notice = ref('')
 const search = ref('')
+const statusForm = reactive({ resource_type: 'book', id: '', status: 'reserved', condition: 'good' })
 const form = reactive({
   id: null,
   resource_type: 'book',
@@ -194,6 +213,39 @@ async function saveResource() {
   }
 }
 
+async function updateResourceStatus() {
+  error.value = ''
+  notice.value = ''
+  const resourceId = Number(statusForm.id)
+  if (!Number.isSafeInteger(resourceId) || resourceId <= 0) {
+    error.value = 'Enter a valid resource ID.'
+    return
+  }
+  try {
+    const result = await put(
+      `/inventory/${statusForm.resource_type}/${resourceId}`,
+      { data: { status: statusForm.status, condition: statusForm.condition } },
+      props.session.token,
+    )
+    if (!result.ok) {
+      error.value = result.data.error || 'Could not update this resource.'
+      return
+    }
+    const resource = result.data[statusForm.resource_type]
+    if (resource?.status === 'available' && resource?.condition === 'good') {
+      const index = resources.value.findIndex((item) => item.resource_type === resource.resource_type && item.id === resource.id)
+      if (index === -1) resources.value.unshift(resource)
+      else resources.value.splice(index, 1, resource)
+    } else {
+      resources.value = resources.value.filter((item) => !(item.resource_type === statusForm.resource_type && item.id === resourceId))
+    }
+    notice.value = `${resource?.name || `Resource #${resourceId}`} status and condition updated.`
+    statusForm.id = ''
+  } catch (requestError) {
+    error.value = requestError.message || 'Could not reach the server.'
+  }
+}
+
 async function deleteResource(resource) {
   const label = `${resource.name} (ID ${resource.id})`
   if (!window.confirm(`Delete ${label}? This action cannot be undone.`)) return
@@ -220,7 +272,7 @@ async function deleteResource(resource) {
   }
 }
 
-onMounted(loadInventory)
+onMounted(() => { if (isAdmin.value) loadInventory() })
 </script>
 
 <template>
@@ -236,9 +288,17 @@ onMounted(loadInventory)
     </header>
 
     <section class="dashboard-content">
+      <nav class="dashboard-nav" aria-label="Staff tools">
+        <button v-for="panel in panels" :key="panel.id" type="button"
+          :class="{ active: activePanel === panel.id }" @click="activePanel = panel.id">
+          {{ panel.label }}
+        </button>
+      </nav>
+
+      <div v-if="activePanel === 'inventory'" class="dashboard-panel">
       <div class="dashboard-heading">
         <div>
-          <p class="eyebrow">Administrator portal</p>
+          <p class="eyebrow">{{ isAdmin ? 'Administrator portal' : 'Staff portal' }}</p>
           <h1>Resource inventory</h1>
           <p class="sub">Manage SALISES books, journals, archival items, and rooms.</p>
         </div>
@@ -254,11 +314,6 @@ onMounted(loadInventory)
           <span class="summary-caption">In good condition</span>
         </div>
       </section>
-
-      <p class="inventory-scope">
-        The current API lists only available resources in good condition. Reserved, lost, or damaged
-        records are not included in this view.
-      </p>
 
       <section v-if="showForm" class="resource-form-card">
         <div class="section-heading">
@@ -378,6 +433,25 @@ onMounted(loadInventory)
           </table>
         </div>
       </section>
+
+      <section class="resource-form-card status-lookup-card">
+        <div class="section-heading">
+          <div><h2>Update resource status</h2><p class="sub">Use the resource ID to change its availability or condition.</p></div>
+        </div>
+        <form class="ops-form" @submit.prevent="updateResourceStatus">
+          <label>Resource type<select v-model="statusForm.resource_type"><option v-for="type in resourceTypes" :key="type.value" :value="type.value">{{ type.label }}</option></select></label>
+          <label>Resource ID<input v-model="statusForm.id" type="number" min="1" step="1" required /></label>
+          <label>Status<select v-model="statusForm.status"><option value="available">Available</option><option value="reserved">Reserved</option></select></label>
+          <label>Condition<select v-model="statusForm.condition"><option value="good">Good</option><option value="lost">Lost</option><option value="damaged">Damaged</option></select></label>
+          <button class="btn" type="submit">Save status</button>
+        </form>
+      </section>
+      </div>
+
+      <ReservationDesk v-else-if="activePanel === 'reservations'" :session="session" />
+      <SalesDesk v-else-if="activePanel === 'sales'" :session="session" />
+      <ReportsDesk v-else-if="activePanel === 'reports'" :session="session" />
+      <UserAccountsDesk v-else-if="activePanel === 'accounts'" :session="session" />
     </section>
   </main>
 </template>

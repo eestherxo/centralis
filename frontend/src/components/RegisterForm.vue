@@ -1,22 +1,28 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { post, fmt } from '../api'
+import VisitPurpose from './VisitPurpose.vue'
 
 const emit = defineEmits(['exists'])
+const props = defineProps({ session: { type: Object, default: null } })
 const blank = () => ({
   type: 'undergraduate', name: '', phone_number: '',
-  id_number: '', faculty: '', purpose: '',
+  student_id: '', faculty: '', purpose: '',
 })
 const form = reactive(blank())
 const errors = ref({})
 const banner = ref(null)
 const busy = ref(false)
+const formElement = ref(null)
+const purposeForm = ref(null)
 
 const isStudent = () => form.type !== 'external'
 
 async function submit() {
   errors.value = {}
   banner.value = null
+  if (purposeForm.value?.validate() === false || !formElement.value?.reportValidity()) return
+  const reservationRequest = purposeForm.value?.getReservationData()
 
   const body = {
     type: form.type,
@@ -25,7 +31,7 @@ async function submit() {
     purpose: form.purpose,
   }
   if (isStudent()) {
-    body.id_number = form.id_number
+    body.student_id = form.student_id
     body.faculty = form.faculty
   }
 
@@ -33,18 +39,45 @@ async function submit() {
   try {
     const { ok, status, data } = await post('/visitors/register', body)
     if (ok) {
-      const visitorId = form.type === 'external'
-        ? ` Your visitor ID is ${data.visitor.id}; use it for future visits.`
-        : ''
+      let reservationConfirmation = ''
+      if (reservationRequest) {
+        let result
+        try {
+          result = await post(`/reservations/${reservationRequest.type}`, {
+            ...reservationRequest,
+            visitor_id: data.visitor.id,
+          }, props.session.token)
+        } catch (reservationError) {
+          banner.value = {
+            ok: false,
+            text: `The visitor was registered and checked in, but the reservation request could not be submitted: ${reservationError.message || 'Please try again.'}`,
+          }
+          Object.assign(form, blank())
+          return
+        }
+        if (!result.ok) {
+          banner.value = {
+            ok: false,
+            text: `The visitor was registered and checked in, but the reservation request could not be submitted: ${result.data.error || 'Please try again.'}`,
+          }
+          Object.assign(form, blank())
+          return
+        }
+        reservationConfirmation = ` Reservation request #${result.data.reservation.id} was submitted for administrator review.`
+        const recent = JSON.parse(sessionStorage.getItem('centralis-recent-reservations') || '[]')
+        recent.push({ ...result.data.reservation, visitor_name: data.visitor.name, resource_name: result.data.resource.name })
+        sessionStorage.setItem('centralis-recent-reservations', JSON.stringify(recent.slice(-20)))
+      }
       banner.value = {
         ok: true,
-        text: `${data.message} Checked in at ${fmt(data.visit.check_in)}.${visitorId}`,
+        text: `${data.message} Checked in at ${fmt(data.visit.check_in)}. Your visitor ID is ${data.visitor.id}; use it for future visits.${reservationConfirmation}`,
       }
       Object.assign(form, blank())
     } else if (status === 409) {
       emit('exists', {
-        id_number: body.id_number || '',
+        student_id: body.student_id || '',
         purpose: body.purpose,
+        reservationRequest,
         message: data.error,
       })
     } else {
@@ -60,7 +93,7 @@ async function submit() {
 </script>
 
 <template>
-  <form novalidate @submit.prevent="submit">
+  <form ref="formElement" novalidate @submit.prevent="submit">
     <label>Visitor type
       <select v-model="form.type" :class="{ bad: errors.type }">
         <option value="undergraduate">Undergraduate student</option>
@@ -71,22 +104,22 @@ async function submit() {
     </label>
 
     <label>Full name
-      <input v-model="form.name" :class="{ bad: errors.name }" placeholder="Jane Doe" />
+      <input v-model="form.name" :class="{ bad: errors.name }" placeholder="Jane Doe" required />
       <span class="err">{{ errors.name }}</span>
     </label>
 
     <label>Phone number
-      <input v-model="form.phone_number" type="tel" :class="{ bad: errors.phone_number }" placeholder="876 123 4567" />
+      <input v-model="form.phone_number" type="tel" :class="{ bad: errors.phone_number }" placeholder="876 123 4567" required />
       <span class="err">{{ errors.phone_number }}</span>
     </label>
 
-    <label v-if="isStudent()">ID number
-      <input v-model="form.id_number" :class="{ bad: errors.id_number }" placeholder="e.g. 620123456" />
-      <span class="err">{{ errors.id_number }}</span>
+    <label v-if="isStudent()">Student ID
+      <input v-model="form.student_id" :class="{ bad: errors.student_id }" placeholder="e.g. 620123456" required />
+      <span class="err">{{ errors.student_id }}</span>
     </label>
 
     <label v-if="isStudent()">Faculty
-      <input v-model="form.faculty" list="faculties" :class="{ bad: errors.faculty }" placeholder="Choose or type" />
+      <input v-model="form.faculty" list="faculties" :class="{ bad: errors.faculty }" placeholder="Choose or type" required />
       <datalist id="faculties">
         <option>Engineering</option>
         <option>Humanities and Education</option>
@@ -99,10 +132,9 @@ async function submit() {
       <span class="err">{{ errors.faculty }}</span>
     </label>
 
-    <label>Purpose of visit
-      <input v-model="form.purpose" :class="{ bad: errors.purpose }" placeholder="e.g. Research" />
-      <span class="err">{{ errors.purpose }}</span>
-    </label>
+    <VisitPurpose ref="purposeForm" v-model="form.purpose"
+      :staff-authenticated="session?.user?.role === 'staff'" />
+    <span class="err">{{ errors.purpose }}</span>
 
     <button class="btn" type="submit" :disabled="busy">Register and check in</button>
     <div v-if="banner" class="banner" :class="banner.ok ? 'ok' : 'bad'">{{ banner.text }}</div>

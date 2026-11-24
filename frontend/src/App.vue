@@ -18,7 +18,7 @@ function onExists(payload) {
 function onAuthenticated(session) {
   adminSession.value = session
   sessionStorage.setItem('centralis-admin-session', JSON.stringify(session))
-  page.value = 'dashboard'
+  page.value = session.user.role === 'staff' ? 'visitor' : 'dashboard'
 }
 
 function signOut() {
@@ -33,9 +33,9 @@ onMounted(() => {
 
   try {
     const session = JSON.parse(savedSession)
-    if (session?.token && session?.user?.role === 'admin') {
+    if (session?.token && ['admin', 'staff'].includes(session?.user?.role)) {
       adminSession.value = session
-      page.value = 'dashboard'
+      page.value = session.user.role === 'staff' ? 'visitor' : 'dashboard'
     } else {
       sessionStorage.removeItem('centralis-admin-session')
     }
@@ -59,6 +59,11 @@ onMounted(() => {
   <main v-else class="card">
     <section class="campus-panel" aria-label="SALISES campus">
       <img class="campus-image" src="/campus.png" alt="SALISES at the University of the West Indies" />
+      <div class="campus-caption">
+        <span>SALISES · UWI</span>
+        <p>Welcome to the visitor centre</p>
+        <small>Register your visit or check in with your visitor ID.</small>
+      </div>
     </section>
 
     <section class="form-panel">
@@ -66,22 +71,30 @@ onMounted(() => {
         <img class="brand-logo" src="/salises-logo.jpg" alt="SALISES - The University of the West Indies" />
       </header>
 
+      <div v-if="adminSession?.user?.role === 'staff'" class="staff-mode-bar">
+        <span>Staff assisted check-in · {{ adminSession.user.name }}</span>
+        <div>
+          <button class="text-button" type="button" @click="page = 'dashboard'">Open dashboard</button>
+          <button class="text-button" type="button" @click="signOut">Sign out</button>
+        </div>
+      </div>
+
       <div class="form-content">
         <div class="heading">
           <p class="eyebrow">Visitor Centre</p>
-          <h1>{{ tab === 'register' ? 'Visitor registration' : 'Welcome back' }}</h1>
-          <p class="sub">{{ tab === 'register' ? 'Enter your details to check in' : 'Check in or check out of the campus' }}</p>
+          <h1>{{ tab === 'register' ? 'Visitor registration' : 'Returning visitor' }}</h1>
+          <p class="sub">{{ tab === 'register' ? 'Complete the form to register and check in' : 'Use your visitor ID to check in or check out' }}</p>
         </div>
 
         <div class="tabs" aria-label="Visitor actions">
           <button :class="{ active: tab === 'register' }" @click="tab = 'register'">New visitor</button>
-          <button :class="{ active: tab === 'check' }" @click="tab = 'check'">Check in / out</button>
+          <button :class="{ active: tab === 'check' }" @click="tab = 'check'">Returning visitor</button>
         </div>
 
-        <RegisterForm v-if="tab === 'register'" @exists="onExists" />
-        <CheckForm v-else :prefill="prefill" />
-        <button class="text-button admin-entry" type="button" @click="page = 'admin-login'">
-          Administrator sign in
+        <RegisterForm v-if="tab === 'register'" :session="adminSession" @exists="onExists" />
+        <CheckForm v-else :prefill="prefill" :session="adminSession" />
+        <button v-if="!adminSession" class="text-button admin-entry" type="button" @click="page = 'admin-login'">
+          Staff and administrator sign in
         </button>
       </div>
     </section>

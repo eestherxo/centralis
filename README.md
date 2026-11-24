@@ -35,8 +35,4 @@ Centralis provides the SALISES visitor centre and resource inventory interfaces.
    npm run dev
    ```
 
-The Vite development server proxies visitor, authentication, and inventory requests to `http://127.0.0.1:5000`.
-
-## Inventory dashboard scope
-
-The administrator dashboard uses the existing resource create, update, and delete endpoints. The existing inventory read endpoint returns only resources that are both available and in good condition. It does not provide a complete inventory listing or reservation/borrower details, so reserved, lost, or damaged records and responsible borrowers cannot currently be reviewed or managed from the dashboard.
+The Vite development server proxies visitor, authentication, inventory, reservation, sales, and report requests to `http://127.0.0.1:5000`.
