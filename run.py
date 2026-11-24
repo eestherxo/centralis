@@ -11,7 +11,7 @@ from app.routes.auth import auth_bp
 from app.routes.reports import reports_bp
 from app.routes.sales import sales_bp
 from app.routes.reservations import reservations_bp
-
+from app.routes.fines import fines_bp
 from app.models import Role 
 from app.modules.authentication import create_user
 from app import data_access
@@ -35,9 +35,7 @@ app.register_blueprint(reports_bp)
 app.register_blueprint(sales_bp)
 app.register_blueprint(inventory_bp)
 app.register_blueprint(reservations_bp)
-
-
-
+app.register_blueprint(fines_bp)
 
 
 # CLI to create root admin 
