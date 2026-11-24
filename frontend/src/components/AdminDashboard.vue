@@ -216,6 +216,8 @@ async function saveResource() {
 }
 
 function requestDelete(resource) {
+  error.value = ''
+  notice.value = ''
   pendingDelete.value = resource
 }
 
@@ -237,15 +239,22 @@ async function confirmDelete() {
       props.session.token,
     )
     if (!ok) {
-      error.value = status === 409
-        ? 'This resource has an active reservation and cannot be deleted.'
-        : data.error || 'Could not delete this resource.'
+      error.value = status === 401
+        ? 'Your sign-in has expired. Sign in again before deleting resources.'
+        : status === 409
+          ? 'This resource has a pending or approved reservation. Cancel that request before deleting it.'
+          : status === 404
+            ? 'This resource was not found. Refresh the inventory and try again.'
+            : data.error || 'Could not delete this resource.'
       pendingDelete.value = null
       return
     }
     resources.value = resources.value.filter((item) =>
       !(item.resource_type === resource.resource_type && item.id === resource.id),
     )
+    if (editing.value && form.resource_type === resource.resource_type && form.id === resource.id) {
+      resetForm()
+    }
     notice.value = 'Resource deleted.'
     pendingDelete.value = null
   } catch (requestError) {
@@ -409,7 +418,9 @@ onMounted(() => { if (isAdmin.value) loadInventory() })
                 <td>
                   <div class="table-actions">
                     <button class="text-button" type="button" @click="editResource(resource)">Edit</button>
-                    <button class="text-button danger-link" type="button" @click="requestDelete(resource)">Delete</button>
+                    <button class="text-button danger-link" type="button"
+                      :aria-label="`Delete ${resource.name}`"
+                      @click.stop.prevent="requestDelete(resource)">Delete</button>
                   </div>
                 </td>
               </tr>

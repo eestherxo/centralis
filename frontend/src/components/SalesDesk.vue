@@ -32,6 +32,7 @@ async function recordSale() {
   error.value = ''
   notice.value = ''
   busy.value = true
+  let createdSale = null
   try {
     const result = await post('/sales', {
       journal_id: Number(form.journal_id),
@@ -42,11 +43,27 @@ async function recordSale() {
       error.value = result.data.error || 'Could not record the sale.'
       return
     }
-    notice.value = `Sale #${result.data.sale.id} recorded. Confirm payment before issuing its receipt.`
+    const sale = result.data.sale
+    createdSale = sale
+    const paymentResult = await post(`/sales/${sale.id}/confirm-payment`, {}, props.session.token)
+    if (!paymentResult.ok) {
+      notice.value = `Sale #${sale.id} was recorded, but payment could not be confirmed. You can retry from Recent sales.`
+      form.quantity = 1
+      await loadData()
+      error.value = paymentResult.data.error || 'Payment confirmation failed.'
+      return
+    }
+    notice.value = `Sale #${sale.id} recorded and payment confirmed.`
     form.quantity = 1
     await loadData()
   } catch (requestError) {
-    error.value = requestError.message || 'Could not reach the server.'
+    if (createdSale) {
+      notice.value = `Sale #${createdSale.id} was recorded, but payment confirmation could not be completed. You can retry from Recent sales.`
+      await loadData()
+      error.value = requestError.message || 'Payment confirmation failed.'
+    } else {
+      error.value = requestError.message || 'Could not reach the server.'
+    }
   } finally {
     busy.value = false
   }
@@ -96,7 +113,7 @@ onMounted(loadData)
 <template>
   <section class="ops-grid">
     <section class="ops-card">
-      <div class="section-heading"><div><h2>Record a journal sale</h2><p class="sub">Payment is recorded after it is received through SALISES channels.</p></div></div>
+      <div class="section-heading"><div><h2>Record a journal sale</h2><p class="sub">Record the sale once payment has been received through SALISES channels.</p></div></div>
       <form class="ops-form sales-form" @submit.prevent="recordSale">
         <label>Journal
           <select v-model="form.journal_id" required>
@@ -115,7 +132,7 @@ onMounted(loadData)
     </section>
 
     <section class="ops-card">
-      <div class="section-heading"><div><h2>Recent sales</h2><p class="sub">Confirm payment and issue receipts from here.</p></div><button class="btn ghost refresh-button" type="button" @click="loadData">Refresh</button></div>
+      <div class="section-heading"><div><h2>Recent sales</h2><p class="sub">Review payment status and issue receipts from here.</p></div><button class="btn ghost refresh-button" type="button" @click="loadData">Refresh</button></div>
       <p v-if="error" class="banner bad" role="alert">{{ error }}</p>
       <p v-if="notice" class="banner ok" role="status">{{ notice }}</p>
       <div v-if="sales.length" class="table-wrap ops-table-wrap"><table>

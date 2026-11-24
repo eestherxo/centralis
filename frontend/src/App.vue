@@ -7,30 +7,40 @@ import AdminDashboard from './components/AdminDashboard.vue'
 const page = ref('visitor')
 const adminSession = ref(null)
 
-function isAdminHash() {
-  return window.location.hash === '#admin'
+function isAuthPath() {
+  return window.location.pathname.replace(/\/$/, '') === '/auth'
+}
+
+function navigate(path, replace = false) {
+  if (replace) history.replaceState(null, '', path)
+  else history.pushState(null, '', path)
+  syncPageFromLocation()
 }
 
 function showVisitor() {
-  if (window.location.hash === '#admin') {
-    history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
-  }
-  page.value = 'visitor'
+  navigate('/')
+}
+
+function showAuth() {
+  navigate('/auth')
 }
 
 function syncPageFromLocation() {
+  if (window.location.hash === '#admin') {
+    history.replaceState(null, '', '/auth')
+  }
   if (adminSession.value) {
-    if (!isAdminHash()) window.location.hash = 'admin'
+    if (!isAuthPath()) history.replaceState(null, '', '/auth')
     page.value = 'dashboard'
     return
   }
-  page.value = isAdminHash() ? 'admin-login' : 'visitor'
+  page.value = isAuthPath() ? 'admin-login' : 'visitor'
 }
 
 function onAuthenticated(session) {
   adminSession.value = session
   sessionStorage.setItem('centralis-admin-session', JSON.stringify(session))
-  if (!isAdminHash()) window.location.hash = 'admin'
+  navigate('/auth')
   page.value = 'dashboard'
 }
 
@@ -56,11 +66,11 @@ onMounted(() => {
   }
 
   syncPageFromLocation()
-  window.addEventListener('hashchange', syncPageFromLocation)
+  window.addEventListener('popstate', syncPageFromLocation)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('hashchange', syncPageFromLocation)
+  window.removeEventListener('popstate', syncPageFromLocation)
 })
 </script>
 
@@ -98,6 +108,9 @@ onUnmounted(() => {
         </div>
 
         <RegisterForm />
+        <button class="text-button admin-entry" type="button" @click="showAuth">
+          Staff and administrator sign in
+        </button>
       </div>
     </section>
   </main>

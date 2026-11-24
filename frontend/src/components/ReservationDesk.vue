@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { get, post } from '../api'
 
 const props = defineProps({ session: { type: Object, required: true } })
+const RECENT_RESERVATIONS_KEY = 'centralis-recent-reservations'
 const isAdmin = computed(() => props.session.user.role === 'admin')
 const reservationTypes = [
   { value: 'room', label: 'Room' },
@@ -41,18 +42,47 @@ async function loadReservations() {
   error.value = ''
   try {
     const result = await post('/reports/generate', {
-      report_type: 'reservation', start_date: '2000-01-01', end_date: todayText,
+      report_type: 'reservation', start_date: '2000-01-01', end_date: '2099-12-31',
     }, props.session.token)
     if (!result.ok) {
       error.value = result.data.error || 'Could not load reservation requests.'
       return
     }
     reservations.value = result.data.records || []
+    // The visitor desk keeps a local snapshot. Reconcile it with the latest
+    // authoritative statuses so staff sessions in another tab stay current.
+    const latestById = new Map(reservations.value.map((item) => [String(item.id), item]))
+    const recent = readRecentRequests().map((item) => {
+      const latest = latestById.get(String(item.id))
+      return latest ? { ...item, ...latest } : item
+    })
+    writeRecentRequests(recent)
   } catch (requestError) {
     error.value = requestError.message || 'Could not reach the server.'
   } finally {
     loading.value = false
   }
+}
+
+function readRecentRequests() {
+  try {
+    const stored = localStorage.getItem(RECENT_RESERVATIONS_KEY)
+    if (stored) return JSON.parse(stored)
+    // Carry forward requests saved by earlier frontend versions.
+    const legacy = JSON.parse(sessionStorage.getItem(RECENT_RESERVATIONS_KEY) || '[]')
+    if (legacy.length) localStorage.setItem(RECENT_RESERVATIONS_KEY, JSON.stringify(legacy))
+    return legacy
+  } catch { return [] }
+}
+
+function writeRecentRequests(items) {
+  localStorage.setItem(RECENT_RESERVATIONS_KEY, JSON.stringify(items))
+  recentRequests.value = items
+}
+
+function syncRecentRequestStatuses(event) {
+  if (isAdmin.value || (event && event.key !== RECENT_RESERVATIONS_KEY)) return
+  recentRequests.value = readRecentRequests()
 }
 
 async function submitRequest() {
@@ -80,8 +110,7 @@ async function submitRequest() {
       visitor_name: result.data.visitor.name,
       resource_name: result.data.resource.name,
     }
-    recentRequests.value = [...recentRequests.value.filter((item) => item.id !== recent.id), recent].slice(-20)
-    sessionStorage.setItem('centralis-recent-reservations', JSON.stringify(recentRequests.value))
+    writeRecentRequests([...recentRequests.value.filter((item) => String(item.id) !== String(recent.id)), recent].slice(-20))
     form.visitor_id = ''
     if (isAdmin.value) await loadReservations()
   } catch (requestError) {
@@ -128,10 +157,9 @@ async function updateExisting() {
     notice.value = actionForm.action === 'return'
       ? `Book reservation #${id} marked as returned.`
       : `Reservation #${id} cancelled.`
-    recentRequests.value = recentRequests.value.map((item) => item.id === id
+    writeRecentRequests(recentRequests.value.map((item) => String(item.id) === String(id)
       ? { ...item, status: actionForm.action === 'return' ? 'returned' : 'cancelled', actual_return: body.actual_return }
-      : item)
-    sessionStorage.setItem('centralis-recent-reservations', JSON.stringify(recentRequests.value))
+      : item))
     actionForm.id = ''
   } catch (requestError) {
     error.value = requestError.message || 'Could not reach the server.'
@@ -143,10 +171,12 @@ onMounted(() => {
   loadResources()
   loadReservations()
   if (!isAdmin.value) {
-    try { recentRequests.value = JSON.parse(sessionStorage.getItem('centralis-recent-reservations') || '[]') }
-    catch { recentRequests.value = [] }
+    recentRequests.value = readRecentRequests()
+    window.addEventListener('storage', syncRecentRequestStatuses)
   }
 })
+
+onBeforeUnmount(() => window.removeEventListener('storage', syncRecentRequestStatuses))
 </script>
 
 <template>
