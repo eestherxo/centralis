@@ -6,6 +6,7 @@ import SalesDesk from './SalesDesk.vue'
 import ReportsDesk from './ReportsDesk.vue'
 import UserAccountsDesk from './UserAccountsDesk.vue'
 import VisitorDesk from './VisitorDesk.vue'
+import FineManagementDesk from './FineManagementDesk.vue'
 
 const props = defineProps({
   session: { type: Object, required: true },
@@ -17,12 +18,14 @@ const panels = computed(() => isAdmin.value
   ? [
       { id: 'inventory', label: 'Inventory' },
       { id: 'reservations', label: 'Reservations' },
+      { id: 'fines', label: 'Fines & returns' },
       { id: 'reports', label: 'Reports' },
       { id: 'accounts', label: 'Staff accounts' },
     ]
   : [
       { id: 'visitors', label: 'Visitors' },
       { id: 'reservations', label: 'Reservations' },
+      { id: 'fines', label: 'Fines & returns' },
       { id: 'sales', label: 'Journal sales' },
     ])
 
@@ -432,6 +435,7 @@ onMounted(() => { if (isAdmin.value) loadInventory() })
 
       <VisitorDesk v-else-if="activePanel === 'visitors'" :session="session" />
       <ReservationDesk v-else-if="activePanel === 'reservations'" :session="session" />
+      <FineManagementDesk v-else-if="activePanel === 'fines'" :session="session" />
       <SalesDesk v-else-if="activePanel === 'sales'" :session="session" />
       <ReportsDesk v-else-if="activePanel === 'reports'" :session="session" />
       <UserAccountsDesk v-else-if="activePanel === 'accounts'" :session="session" />
