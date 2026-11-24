@@ -153,7 +153,7 @@ def test_receipt_pdf_after_payment_confirmed(journal):
     pdf = journal_sales.generate_receipt_pdf(sale["id"]).read()
 
     assert pdf.startswith(b"%PDF")
-    for text in ["Social and Economic Studies", "$30.00", "2026-11-18", "Payment received"]:
+    for text in ["Social and Economic Studies", "$30.00", "2026-11-18"]:
         assert text.encode() in pdf
 
 

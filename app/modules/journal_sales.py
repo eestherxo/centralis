@@ -124,7 +124,6 @@ def generate_receipt_pdf(sale_id):
     # Payment confirmation
     pdf.line(60, y, width - 60, y)
     pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(70, y - 30, "Payment received - confirmed by SALISES staff")
     pdf.setFont("Helvetica-Oblique", 10)
     pdf.drawCentredString(width / 2, 60, "Thank you for your purchase.")
 

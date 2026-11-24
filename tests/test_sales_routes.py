@@ -140,7 +140,7 @@ def test_confirm_payment_then_receipt(client, staff, journal):
     assert receipt.data.rstrip().endswith(b"%%EOF")
     assert b"/Count 1" in receipt.data  # one page
     for text in [str(sale["id"]), "Social and Economic Studies", "2",
-                 "$20.00", "2026-11-18", "Payment received"]:
+                 "$20.00", "2026-11-18"]:
         assert text.encode() in receipt.data
 
 

@@ -39,8 +39,8 @@ def _find_visitor_by_student_id(student_id: str | None) -> dict[str, Any] | None
         (
             visitor
             for visitor in data_access.get_all_records("visitor")
-            if isinstance(visitor.get("id"), str)
-            and visitor["id"].strip().casefold() == normalized_id
+            if isinstance(visitor.get("student_id"), str)
+            and visitor["student_id"].strip().casefold() == normalized_id
         ),
         None,
     )

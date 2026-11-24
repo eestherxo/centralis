@@ -70,7 +70,7 @@ def test_full_journal_sale_workflow(client):
     assert receipt.status_code == 200
     assert receipt.mimetype == "application/pdf"
     assert receipt.data.startswith(b"%PDF")
-    for text in ["Social and Economic Studies", "$20.00", "2026-11-18", "Payment received"]:
+    for text in ["Social and Economic Studies", "$20.00", "2026-11-18"]:
         assert text.encode() in receipt.data
 
     # The admin can use the saved sale in the existing journal sales report
