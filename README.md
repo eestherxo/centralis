@@ -1,73 +1,45 @@
-# Centralis
+# Centralis Visitor Centre Guide
 
-Centralis is the SALISES visitor centre application. It includes visitor registration and check-in, staff and administrator tools, inventory, reservations, fines, journal sales, and reports.
+Centralis is the online desk for SALISES visitor check-in and centre services. Use it to register a visit, help returning visitors, and manage reservations, resources, returns, and sales.
 
-## Deploy the frontend to Vercel
+**Open Centralis:** [centralis.vercel.app](https://centralis-pi.vercel.app/)
 
-The Vercel project serves the Vue frontend and proxies its `/api/*` requests to the Flask API. The Flask API must be running at a public HTTPS URL on a host with persistent storage. This repository currently stores records in JSON files, so do not use an ephemeral serverless filesystem for the API data.
+## Visiting SALISES?
 
-1. Push this repository to GitHub, GitLab, or Bitbucket and import it into Vercel.
-2. Set **Root Directory** to `frontend`.
-3. Use these build settings:
+### Register and check in
 
-   | Setting | Value |
-   | --- | --- |
-   | Framework preset | Vite |
-   | Install command | `npm ci` |
-   | Build command | `npm run build` |
-   | Output directory | `dist` |
+1. Open the Centralis link and complete the visitor registration form.
+2. Choose your visitor type. Students should include their student ID
+3. Select the reason for your visit 
+4. Submit the form. Centralis confirms your registration and displays your visitor ID. Keep it handy for future visits.
 
-4. Deploy the Flask API separately on a persistent host. Give it a public HTTPS URL and configure its working directory at the repository root so the existing `data/` JSON store is on persistent storage. Set a strong `JWT_SECRET_KEY` in the API host's environment. A typical WSGI start command is `gunicorn run:app` (install `gunicorn` alongside `requirements.txt` on that host).
-5. In Vercel, open **Project Settings → Environment Variables** and add:
+If you have visited before, ask a staff member to check you in using your visitor ID.
 
-   | Name | Value |
-   | --- | --- |
-   | `BACKEND_URL` | The Flask API's HTTPS origin, for example `https://centralis-api.example.com` |
+### Request a room or resource
 
-   Keep this as a server-side variable. Do not prefix it with `VITE_`. The Vercel function in `frontend/api/[...path].js` forwards API requests and receipt/report downloads to this backend.
-6. Redeploy after setting the environment variable.
+Reservation requests are submitted by SALISES staff. Tell a staff member what you need and when; they can select an available room, book, or archival item and submit the request. Staff can follow its status in the Reservations area.
 
-The SPA rewrite in `frontend/vercel.json` serves the Vue application for direct page loads. Open `https://<your-vercel-domain>/auth` to reach staff and administrator sign-in. After sign-in, staff or admin users land in the dashboard; the existing visitor page remains at `/`.
+## SALISES staff
 
-### Create the first administrator
+Choose **Staff and administrator sign in** on the welcome page, or open the [staff sign-in page](https://centralis-pi.vercel.app/auth), and sign in with your staff account.
 
-The repository does not expose a public first-admin setup endpoint. Create the first admin securely on the API host (or locally before deploying) using the Flask application shell:
+The dashboard gives staff access to:
 
-```sh
-flask --app run.py shell
-```
+- **Visitors:** Find visitor records and check returning visitors in or out.
+- **Reservations:** Submit and review room, book, and archival item requests.
+- **Fines & returns:** Record item returns and condition, track fines, confirm payments, and provide receipts.
+- **Journal sales:** Record sales and review sales history.
 
-Then, in the shell, enter:
+To check in a returning visitor, open **Visitors**, enter their visitor ID, and record the purpose of the visit. When they leave, check them out from the same area.
 
-```python
-from app.modules.authentication import create_user
-create_user({"name": "Administrator", "email": "admin@example.com", "password": "use-a-unique-password", "role": "admin"})
-```
+## Administrators
 
-Change the sample name, email, and password. The user record is stored in `data/user.json`; ensure that directory persists on the API host. After the first administrator signs in at `/auth`, they can create staff accounts in the dashboard.
+Administrators have staff tools plus access to:
 
-## Run locally
+- **Inventory:** Add or update books, journals, archival items, and rooms, including availability and relevant details.
+- **Reports:** Review centre activity and export records for visitors, reservations, journal sales, or fines.
+- **Staff accounts:** Create accounts for staff members who need dashboard access.
 
-1. Create a virtual environment and install dependencies:
+## Need help?
 
-   ```powershell
-   py -m venv venv
-   .\venv\Scripts\python.exe -m pip install -r requirements.txt
-   $env:JWT_SECRET_KEY = "<a-long-random-secret>"
-   ```
-
-2. Start the Flask API in one terminal:
-
-   ```powershell
-   .\venv\Scripts\python.exe run.py
-   ```
-
-3. Start the Vite frontend in another terminal:
-
-   ```powershell
-   Set-Location frontend
-   npm ci
-   npm run dev
-   ```
-
-The Vite development server proxies API requests to `http://127.0.0.1:5000`. Create the first administrator with the Flask shell instructions above, then open `/auth` on the Vite development server.
+If you cannot sign in or a visitor cannot be found, ask a Centralis administrator for help. Administrators can create staff accounts; visitors should ask staff to look up an existing record before registering again.
