@@ -5,7 +5,14 @@ from datetime import datetime, date, time
 from typing import Any
 from enum import Enum
 
-DB_DIR = Path("./data")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+configured_data_dir = os.getenv("DATA_DIR")
+
+DB_DIR = (
+    Path(configured_data_dir).expanduser().resolve()
+    if configured_data_dir
+    else (PROJECT_ROOT / "data").resolve()
+)
 RESOURCE_PREFIXES = {
     "user": 100,
     "visitor": 191,
