@@ -1,0 +1,47 @@
+[
+    {
+        "demo_key": "demo-reservation-1",
+        "visitor_id": 19100001,
+        "resource_id": 39300001,
+        "reservation_type": "room",
+        "status": "pending",
+        "request_date": "2026-11-24",
+        "reserve_date": "2026-12-01",
+        "start_time": "10:00",
+        "end_time": "11:00",
+        "occupants": 8,
+        "id": 69600001
+    },
+    {
+        "demo_key": "demo-reservation-2",
+        "visitor_id": 19100002,
+        "resource_id": 59500001,
+        "reservation_type": "archival",
+        "status": "declined",
+        "request_date": "2026-11-24",
+        "reserve_date": "2026-12-01",
+        "start_time": "10:00",
+        "end_time": "11:00",
+        "id": 69600002
+    },
+    {
+        "demo_key": "demo-reservation-3",
+        "visitor_id": 19100001,
+        "resource_id": 29200001,
+        "reservation_type": "book",
+        "status": "approved",
+        "request_date": "2026-11-24",
+        "expected_return": "2026-11-22",
+        "id": 69600003
+    },
+    {
+        "demo_key": "demo-reservation-4",
+        "visitor_id": 19100003,
+        "resource_id": 29200003,
+        "reservation_type": "book",
+        "status": "approved",
+        "request_date": "2026-11-24",
+        "expected_return": "2026-12-08",
+        "id": 69600004
+    }
+]
