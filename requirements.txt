@@ -22,4 +22,4 @@ openpyxl==3.1.5
 reportlab==5.1.0
 pillow==13.0.0
 charset-normalizer==3.5.2
-gunincorn==27.0.1
+gunicorn==27.0.1
