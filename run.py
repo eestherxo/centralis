@@ -36,6 +36,9 @@ app.register_blueprint(inventory_bp)
 app.register_blueprint(reservations_bp)
 app.register_blueprint(fines_bp)
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 if __name__ == "__main__":
     app.run()
