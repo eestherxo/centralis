@@ -17,6 +17,32 @@ OPEN_TIME = time(8, 30)
 CLOSE_TIME = time(16, 30)
 
 
+def _has_overlapping_approved_reservation(
+    reservation_type: str,
+    resource_id: int,
+    reserve_date: str,
+    start_time: time,
+    end_time: time,
+) -> bool:
+    
+    for existing in data_access.get_all_records("reservation"):
+        if (
+            existing.get("status") != ReservationStatus.APPROVED.value
+            or existing.get("reservation_type") != reservation_type
+            or existing.get("resource_id") != resource_id
+            or existing.get("reserve_date") != reserve_date
+        ):
+            continue
+
+        existing_start = time.fromisoformat(existing["start_time"])
+        existing_end = time.fromisoformat(existing["end_time"])
+
+        if start_time < existing_end and existing_start < end_time:
+            return True
+
+    return False
+
+
 def create_reservation(reservation_type: str, data: dict) -> tuple[dict, int]:
     if reservation_type not in SUPPORTED_TYPES:
         return {"error": "Choose room, archival, or book."}, 400
@@ -61,6 +87,18 @@ def create_reservation(reservation_type: str, data: dict) -> tuple[dict, int]:
                 return {
                     "error": "The reservation must fall between 08:30 and 16:30."
                 }, 400
+
+            if _has_overlapping_approved_reservation(
+                reservation_type=reservation_type,
+                resource_id=resource_id,
+                reserve_date=reserve_date.isoformat(),
+                start_time=start_time,
+                end_time=end_time,
+            ):
+                return {
+                    "error": "This request overlaps an approved reservation."
+                }, 409
+
 
             if reservation_type == "room":
                 occupants = data.get("occupants")
@@ -132,25 +170,17 @@ def approve_reservation(reservation_id: int) -> tuple[dict, int]:
         return {"error": "This resource is no longer available."}, 409
 
     if reservation_type in ONSITE_TYPES:
-        candidate_start = time.fromisoformat(reservation["start_time"])
-        candidate_end = time.fromisoformat(reservation["end_time"])
+        if _has_overlapping_approved_reservation(
+            reservation_type=reservation_type,
+            resource_id=reservation["resource_id"],
+            reserve_date=reservation["reserve_date"],
+            start_time=time.fromisoformat(reservation["start_time"]),
+            end_time=time.fromisoformat(reservation["end_time"]),
+        ):
+            return {
+                "error": "This request overlaps an approved reservation."
+            }, 409
 
-        for existing in data_access.get_all_records("reservation"):
-            if (
-                existing.get("status") != ReservationStatus.APPROVED.value
-                or existing.get("reservation_type") != reservation_type
-                or existing.get("resource_id") != reservation["resource_id"]
-                or existing.get("reserve_date") != reservation["reserve_date"]
-            ):
-                continue
-
-            existing_start = time.fromisoformat(existing["start_time"])
-            existing_end = time.fromisoformat(existing["end_time"])
-
-            if candidate_start < existing_end and existing_start < candidate_end:
-                return {
-                    "error": "This request overlaps an approved reservation."
-                }, 409
 
     updated = data_access.update(
         "reservation",
