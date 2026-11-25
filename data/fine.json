@@ -1,0 +1,22 @@
+[
+    {
+        "demo_key": "demo-fine-unpaid",
+        "visitor_id": 19100001,
+        "resource_id": 29200001,
+        "reason": "late",
+        "amount": 150.0,
+        "date_issued": "2026-11-24",
+        "status": "unpaid",
+        "id": 79700001
+    },
+    {
+        "demo_key": "demo-fine-paid",
+        "visitor_id": 19100002,
+        "resource_id": 29200002,
+        "reason": "damaged",
+        "amount": 300.0,
+        "date_issued": "2026-11-24",
+        "status": "paid",
+        "id": 79700002
+    }
+]

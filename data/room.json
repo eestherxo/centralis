@@ -1,0 +1,9 @@
+[
+    {
+        "name": "Demo: Seminar Room",
+        "capacity": 20,
+        "status": "available",
+        "condition": "good",
+        "id": 39300001
+    }
+]

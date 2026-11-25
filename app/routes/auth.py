@@ -1,6 +1,6 @@
 
-from flask import Blueprint, request
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+from flask import Blueprint, request  # type: ignore[reportMissingImports]
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required  # type: ignore
 
 from app import data_access
 from app.models import Role
@@ -18,7 +18,7 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
 @auth_bp.post("/login")
 def login():
-    data = request.get_json()
+    data = request.get_json(silent=True)
     if data is None:
         return {"error": "Missing required fields"}, 400
 
@@ -44,7 +44,7 @@ def register_user():
     if creator["role"] != Role.ADMIN.value:
         return {"error": "Only an admin can create accounts."}, 403
 
-    data = request.get_json()
+    data = request.get_json(silent=True)
     if data is None:
         return {"error": "Mising required fields"}, 400
 

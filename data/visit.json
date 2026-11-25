@@ -1,0 +1,26 @@
+[
+    {
+        "demo_key": "demo-visit-1",
+        "visitor_id": 19100001,
+        "purpose": "Research",
+        "check_in": "2026-11-24T09:00:00+00:00",
+        "check_out": null,
+        "id": 99900001
+    },
+    {
+        "demo_key": "demo-visit-2",
+        "visitor_id": 19100002,
+        "purpose": "Consultation",
+        "check_in": "2026-11-23T09:00:00+00:00",
+        "check_out": "2026-11-23T10:00:00+00:00",
+        "id": 99900002
+    },
+    {
+        "demo_key": "demo-visit-3",
+        "visitor_id": 19100003,
+        "purpose": "Seminar",
+        "check_in": "2026-11-22T09:00:00+00:00",
+        "check_out": "2026-11-22T10:00:00+00:00",
+        "id": 99900003
+    }
+]

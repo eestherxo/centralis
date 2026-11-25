@@ -1,115 +1,35 @@
-"""Provisional SALISES records used only for automated testing.
-
-These records do not represent real client data. Their field names match the
-application models and JSON data store.
-"""
+"""Small records matching the JSON schema stored by Centralis services."""
 
 MOCK_REPORT_DATA = {
     "visitor": [
-        {
-            "visitor_id": "V-001",
-            "name": "Maya Brown",
-            "type": "Undergraduate",
-            "check_in": "2026-11-01",
-        },
-        {
-            "visitor_id": "V-001",
-            "name": "Maya Brown",
-            "type": "Undergraduate",
-            "check_in": "2026-11-08",
-        },
-        {
-            "visitor_id": "V-002",
-            "name": "Daniel King",
-            "type": "Postgraduate",
-            "check_in": "2026-11-15",
-        },
-        {
-            "visitor_id": "V-003",
-            "name": "Leah Grant",
-            "type": "Outside Personnel",
-            "check_in": "2026-11-30",
-        },
-        {
-            "visitor_id": "V-004",
-            "name": "Owen Clarke",
-            "type": "Organization",
-            "check_in": "2026-12-01",
-        },
+        {"visitor_id": 19100001, "name": "Maya Brown", "type": "undergraduate", "check_in": "2026-11-01T09:00:00+00:00"},
+        {"visitor_id": 19100001, "name": "Maya Brown", "type": "undergraduate", "check_in": "2026-11-08T09:00:00+00:00"},
+        {"visitor_id": 19100002, "name": "Daniel King", "type": "postgraduate", "check_in": "2026-11-15T09:00:00+00:00"},
+        {"visitor_id": 19100003, "name": "Leah Grant", "type": "external", "check_in": "2026-11-30T09:00:00+00:00"},
+        {"visitor_id": 19100004, "name": "Owen Clarke", "type": "external", "check_in": "2026-12-01T09:00:00+00:00"},
     ],
     "reservation": [
-        {
-            "id": "RS-001",
-            "visitor_id": "Maya Brown",
-            "resource_id": "Seminar Room 1",
-            "request_date": "2026-11-10",
-            "status": "Approved",
-        },
-        {
-            "id": "RS-002",
-            "visitor_id": "Daniel King",
-            "resource_id": "Projector 1",
-            "request_date": "2026-11-18",
-            "status": "Pending",
-        },
-        {
-            "id": "RS-003",
-            "visitor_id": "Leah Grant",
-            "resource_id": "Meeting Room 2",
-            "request_date": "2026-12-02",
-            "status": "Rejected",
-        },
+        {"id": 69600001, "visitor_id": 19100001, "resource_id": 39300001,
+         "reservation_type": "room", "request_date": "2026-11-10", "status": "approved"},
+        {"id": 69600002, "visitor_id": 19100002, "resource_id": 59500001,
+         "reservation_type": "archival", "request_date": "2026-11-18", "status": "pending"},
+        {"id": 69600003, "visitor_id": 19100003, "resource_id": 39300002,
+         "reservation_type": "room", "request_date": "2026-12-02", "status": "declined"},
     ],
     "journal_sales": [
-        {
-            "id": "S-001",
-            "journal_id": "Social and Economic Studies",
-            "quantity": 2,
-            "date_sold": "2026-11-12",
-            "sale_amount": 5000.00,
-        },
-        {
-            "id": "S-002",
-            "journal_id": "Caribbean Dialogue",
-            "quantity": 1,
-            "date_sold": "2026-11-20",
-            "sale_amount": 2500.00,
-        },
-        {
-            "id": "S-003",
-            "journal_id": "Social and Economic Studies",
-            "quantity": 1,
-            "date_sold": "2026-10-31",
-            "sale_amount": 2500.00,
-        },
+        {"id": 89800001, "journal_id": 49400001, "quantity": 2,
+         "date_sold": "2026-11-12", "sale_amount": 5000.0, "payment_confirmed": False},
+        {"id": 89800002, "journal_id": 49400002, "quantity": 1,
+         "date_sold": "2026-11-20", "sale_amount": 2500.0, "payment_confirmed": True},
+        {"id": 89800003, "journal_id": 49400001, "quantity": 1,
+         "date_sold": "2026-10-31", "sale_amount": 2500.0, "payment_confirmed": True},
     ],
     "fines": [
-        {
-            "id": "F-001",
-            "visitor_id": "Maya Brown",
-            "reason": "Overdue",
-            "amount": 150.00,
-            "resource_id": "Caribbean Development",
-            "date_issued": "2026-11-15",
-            "status": "Unpaid",
-        },
-        {
-            "id": "F-002",
-            "visitor_id": "Daniel King",
-            "reason": "Damaged",
-            "amount": 3000.00,
-            "resource_id": "Regional Integration",
-            "date_issued": "2026-11-22",
-            "status": "Paid",
-        },
-        {
-            "id": "F-003",
-            "visitor_id": "Leah Grant",
-            "reason": "Overdue",
-            "amount": 50.00,
-            "resource_id": "Economic Survey",
-            "date_issued": "2026-12-03",
-            "status": "Unpaid",
-        },
+        {"id": 79700001, "visitor_id": 19100001, "reason": "late", "amount": 150.0,
+         "resource_id": 29200001, "date_issued": "2026-11-15", "status": "unpaid"},
+        {"id": 79700002, "visitor_id": 19100002, "reason": "damaged", "amount": 3000.0,
+         "resource_id": 29200002, "date_issued": "2026-11-22", "status": "paid"},
+        {"id": 79700003, "visitor_id": 19100003, "reason": "late", "amount": 50.0,
+         "resource_id": 29200003, "date_issued": "2026-12-03", "status": "unpaid"},
     ],
 }

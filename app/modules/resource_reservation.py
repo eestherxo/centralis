@@ -1,204 +1,246 @@
+import json
 from datetime import date, datetime, time
+
 from app import data_access
 from app.models import (
-    ArchivalItem,
-    Book,
-    ResourceCondition,
-    ResourceStatus,
-    ResourceType,
-    ReservationStatus,
-    Room,
-    OnsitReservation,
-    RoomReservation,
     ArchivalReservation,
     BookReservation,
+    ReservationStatus,
+    ResourceCondition,
+    ResourceStatus,
+    RoomReservation,
 )
 
-RESOURCE_TYPES = {
-    ResourceType.BOOK.value: BookReservation,
-    ResourceType.ARCHIVAL.value: ArchivalReservation,
-    ResourceType.ROOM.value: RoomReservation
-}
-
-RESOURCE_STATUS = {
-    ResourceStatus.AVAILABLE.value,
-    ResourceStatus.RESERVED.value,
-}
-
-RESOURCE_CONDITION = {
-    ResourceCondition.GOOD.value,
-    ResourceCondition.LOST.value,
-    ResourceCondition.DAMAGED.value,
-}
-
-RESERVATION_STATUS = {
-    ReservationStatus.PENDING.value,
-    ReservationStatus.APPROVED.value,
-    ReservationStatus.DECLINED.value,
-    ReservationStatus.CANCELLED.value,
-}
-
-RESERVATION_TYPES = {
-    "Room Reservation": RoomReservation,
-    "Archival Reservation": ArchivalReservation,
-    "Book Borrowing": BookReservation,
-}
-
-EDITABLE_FIELDS = {
-    "room": {"visitor_id", "name", "start_time", "end_time", "date", "occupants"},
-    "archival": {"visitor_id", "name", "start_time", "end_time", "date"},
-    "book": {"visitor_id", "name", "return_date"}
-}
-
-#Placeholder hours
-OPEN_TIME = time(9, 0)
-CLOSE_TIME = time(17, 0)
-
-#helper functions
-def find_resource_by_name(resource_type, resource_name):
-    all_resources = data_access.get_all_records(resource_type)
-    for r in all_resources:
-        if r["name"] == resource_name:
-            return r
-    return None
+ONSITE_TYPES = {"room", "archival"}
+SUPPORTED_TYPES = ONSITE_TYPES | {"book"}
+OPEN_TIME = time(8, 30)
+CLOSE_TIME = time(16, 30)
 
 
-#checks for clashing reservations
-def check_availability(resource_type, resource_id, start_time, end_time, reservation_date):
-    if not isinstance(start_time, time) and not isinstance(end_time, time):
-        raise ValueError("Invalid Time Format")
+def create_reservation(reservation_type: str, data: dict) -> tuple[dict, int]:
+    if reservation_type not in SUPPORTED_TYPES:
+        return {"error": "Choose room, archival, or book."}, 400
 
-    all_reservations = data_access.get_all_records("reservation")
+    visitor_id = data.get("visitor_id")
+    resource_id = data.get("resource_id")
 
-    for reservation in all_reservations:
-        reservation_start = datetime.strptime(reservation.get("start_time"), "%H:%M").time()
-        reservation_end = datetime.strptime(reservation.get("end_time"), "%H:%M").time()
+    if (
+        type(visitor_id) is not int or visitor_id <= 0
+        or type(resource_id) is not int or resource_id <= 0
+    ):
+        return {"error": "A valid visitor_id and resource_id are required."}, 400
 
-        if(reservation.get("resource_type") == resource_type and
-           reservation.get("resource_id") == resource_id and
-           reservation.get("reservation_date") == reservation_date and
-           reservation_start <= end_time and
-           reservation_end >= start_time and
-           reservation.get("status") == ReservationStatus.APPROVED.value):
-            
-            return False
+    visitor = data_access.get_record("visitor", visitor_id)
+    if visitor is None:
+        return {"error": "Visitor is not registered."}, 404
 
-    return True
-
-#checks if time is during operating hours
-def check_valid_time(start_time, end_time):
-    if start_time < OPEN_TIME or end_time > CLOSE_TIME:
-        return False
-    
-    return True
-
-#changes reservation statuses
-def change_status(reservation, status):
-    if status not in RESERVATION_STATUS:
-        raise ValueError("Invalid Status")
-
-    reservation["status"] = status
-    return reservation
-
-
-#main functions for reservation
-def make_reservation(resource_type, data):
-    model = RESOURCE_TYPES.get(resource_type)
-    allowed_fields = EDITABLE_FIELDS.get(model)
-
-    if model is None:
-        raise ValueError("Invalid resource type")
-
-    if not isinstance(data, dict) or not data:
-        raise ValueError("Invalid reservation data")
-    
-    unexpected_fields = data.keys() - allowed_fields
-    if unexpected_fields:
-        raise ValueError(f"Unnecesary fields entered: {sorted(unexpected_fields)}")
-
-    #checks if resource exists
-    resource = find_resource_by_name(resource_type, data.get("name"))
+    resource = data_access.get_record(reservation_type, resource_id)
     if resource is None:
-        raise ValueError("Resource not found")
+        return {"error": "Resource not found."}, 404
 
-    #checks resource condition and status check
-    condition = resource.get("condition")
-    status = resource.get("status")
-    if not status in RESOURCE_STATUS:
-        raise ValueError("Invalid Resource Status")
+    if resource.get("status") != ResourceStatus.AVAILABLE.value:
+        return {"error": "This resource is not available for requests."}, 409
+    if resource.get("condition") != ResourceCondition.GOOD.value:
+        return {"error": "Lost or damaged resources cannot be requested."}, 409
 
-    if not condition in RESOURCE_CONDITION:
-        raise ValueError("Invalid Resource Condition")
+    request_base = {
+        "visitor": visitor_id,
+        "resource": resource_id,
+        "request_date": date.today(),
+    }
 
-    if condition != ResourceCondition.GOOD.value:
-        return "Resource is in Bad Condition"
+    try:
+        if reservation_type in ONSITE_TYPES:
+            reserve_date = date.fromisoformat(data.get("reserve_date", ""))
+            start_time = time.fromisoformat(data.get("start_time", ""))
+            end_time = time.fromisoformat(data.get("end_time", ""))
 
-    if status == ResourceStatus.RESERVED.value:
-        return "Resource is Reserved"
-    
-    #operating hours check
-    start_time = data["start_time"]
-    end_time = data["end_time"]
-    start_time = datetime.strptime(start_time, "%H:%M").time()
-    end_time = datetime.strptime(end_time, "%H:%M").time()
+            if reserve_date.weekday() >= 5:
+                return {"error": "Reservations must be Monday through Friday."}, 400
+            if not OPEN_TIME <= start_time < end_time <= CLOSE_TIME:
+                return {
+                    "error": "The reservation must fall between 08:30 and 16:30."
+                }, 400
 
-    if not check_valid_time(start_time, end_time):
-        return "Time is outside of Operating Hours"
+            if reservation_type == "room":
+                occupants = data.get("occupants")
+                if type(occupants) is not int or occupants <= 0:
+                    return {"error": "occupants must be a positive integer."}, 400
+                if occupants > resource.get("capacity", 0):
+                    return {"error": "Occupants exceed the room capacity."}, 400
 
-    #availability
-    resource_id = resource.get("resource_id")
-    if not check_availability(resource_type, resource_id, start_time, end_time, data["date"]):
-        return "Resource is not Available at Selected Time."
+                reservation = RoomReservation(
+                    **request_base,
+                    start_time=start_time,
+                    end_time=end_time,
+                    reserve_date=reserve_date,
+                    occupants=occupants,
+                )
+            else:
+                reservation = ArchivalReservation(
+                    **request_base,
+                    start_time=start_time,
+                    end_time=end_time,
+                    reserve_date=reserve_date,
+                )
+        else:
+            expected_return = date.fromisoformat(data.get("expected_return", ""))
+            if expected_return < date.today():
+                return {"error": "expected_return cannot be in the past."}, 400
 
-    reservation = model(**data)
-    change_status(reservation, ReservationStatus.PENDING.value)
-    return data_access.create("reservation", reservation.to_dict()) 
+            reservation = BookReservation(
+                **request_base,
+                expected_return=expected_return,
+                actual_return=None,
+            )
+    except (TypeError, ValueError):
+        return {"error": "Dates and times must use ISO format."}, 400
+
+    saved = data_access.create("reservation", reservation.to_dict())
+    response = {
+        "reservation": saved,
+        "visitor": {
+            "id": visitor["id"],
+            "name": visitor["name"],
+            "student_id": visitor.get("student_id"),
+            "phone_number": visitor.get("phone_number"),
+        },
+        "resource": {"id": resource["id"], "name": resource["name"]},
+    }
+    return response, 201
 
 
-def book_return_date(reservation_id, date_returned): #logs book return date
+def approve_reservation(reservation_id: int) -> tuple[dict, int]:
+
     reservation = data_access.get_record("reservation", reservation_id)
-    reservation["actual_return_date"] = date_returned
+    if reservation is None:
+        return {"error": "Reservation not found."}, 404
+    if reservation.get("status") != ReservationStatus.PENDING.value:
+        return {"error": "Only pending requests can be approved."}, 409
 
-    return data_access.update("reservation", reservation_id, reservation)
+    reservation_type = reservation["reservation_type"]
+    resource = data_access.get_record(
+        reservation_type,
+        reservation["resource_id"],
+    )
+    if resource is None:
+        return {"error": "Resource not found."}, 404
+    if (
+        resource.get("status") != ResourceStatus.AVAILABLE.value
+        or resource.get("condition") != ResourceCondition.GOOD.value
+    ):
+        return {"error": "This resource is no longer available."}, 409
 
+    if reservation_type in ONSITE_TYPES:
+        candidate_start = time.fromisoformat(reservation["start_time"])
+        candidate_end = time.fromisoformat(reservation["end_time"])
 
-def cancel_reservation(reservation_type, reservation_id):
-    if reservation_type not in RESERVATION_TYPES:
-        raise ValueError("Invalid Reservation Type")
+        for existing in data_access.get_all_records("reservation"):
+            if (
+                existing.get("status") != ReservationStatus.APPROVED.value
+                or existing.get("reservation_type") != reservation_type
+                or existing.get("resource_id") != reservation["resource_id"]
+                or existing.get("reserve_date") != reservation["reserve_date"]
+            ):
+                continue
 
-    record = data_access.get_record(reservation_type, reservation_id)
-    if record is None:
-        return None
+            existing_start = time.fromisoformat(existing["start_time"])
+            existing_end = time.fromisoformat(existing["end_time"])
 
-    reservation = change_status(data_access.get_record("reservation"), ReservationStatus.CANCELLED.value)
-    return data_access.update("reservation", reservation_id, reservation)
+            if candidate_start < existing_end and existing_start < candidate_end:
+                return {
+                    "error": "This request overlaps an approved reservation."
+                }, 409
 
+    updated = data_access.update(
+        "reservation",
+        reservation_id,
+        {"status": ReservationStatus.APPROVED.value},
+    )
 
-def accept_deny_reservation(reservation_id, status):
-    reservation = data_access.get_record(reservation_id)
-    reservation = change_status(reservation, status)
-
-    return data_access.update("reservation", reservation_id, reservation)
-
-
-def list_reservations(reservation_type = None): #lists reservation based on type, same logic as list_available_resource
-    if reservation_types is not None and reservation_types not in RESERVATION_TYPES:
-        raise ValueError("Invalid Reservation Types")
-
-    if reservation_type == None:
-        reservation_types = RESERVATION_TYPES #all types
-    else:
-        reservation_types = [reservation_type] #specific types
-
-    available = []
-    
-    for type in reservation_types:
-        records = data_access.get_all_records(type)
-        available.extend(
-            record
-            for record in records
-            if record.get("status") == ResourceStatus.AVAILABLE.value
-            and record.get("condition") == ResourceCondition.GOOD.value
+    if reservation_type == "book":
+        data_access.update(
+            "book",
+            reservation["resource_id"],
+            {"status": ResourceStatus.RESERVED.value},
         )
-    
-    return available
+
+    return updated, 200
+
+
+def decline_reservation(reservation_id: int) -> tuple[dict, int]:
+
+    reservation = data_access.get_record("reservation", reservation_id)
+    if reservation is None:
+        return {"error": "Reservation not found."}, 404
+    if reservation.get("status") != ReservationStatus.PENDING.value:
+        return {"error": "Only pending requests can be declined."}, 409
+
+    updated = data_access.update(
+        "reservation",
+        reservation_id,
+        {"status": ReservationStatus.DECLINED.value},
+    )
+    return updated, 200
+
+
+def cancel_reservation(reservation_id: int) -> tuple[dict, int]:
+
+    reservation = data_access.get_record("reservation", reservation_id)
+    if reservation is None:
+        return {"error": "Reservation not found."}, 404
+    if reservation.get("reservation_type") not in ONSITE_TYPES:
+        return {"error": "Only room and archival requests can be cancelled."}, 400
+    if reservation.get("status") not in {
+        ReservationStatus.PENDING.value,
+        ReservationStatus.APPROVED.value,
+    }:
+        return {"error": "This request cannot be cancelled."}, 409
+
+    scheduled_start = datetime.combine(
+        date.fromisoformat(reservation["reserve_date"]),
+        time.fromisoformat(reservation["start_time"]),
+    )
+    if scheduled_start <= datetime.now():
+        return {
+            "error": "Requests can only be cancelled before their start time."
+        }, 409
+
+    updated = data_access.update(
+        "reservation",
+        reservation_id,
+        {"status": ReservationStatus.CANCELLED.value},
+    )
+    return updated, 200
+
+
+def record_book_return(reservation_id: int, actual_return: str) -> tuple[dict, int]:
+
+    reservation = data_access.get_record("reservation", reservation_id)
+    if reservation is None:
+        return {"error": "Reservation not found."}, 404
+    if reservation.get("reservation_type") != "book":
+        return {"error": "This is not a book reservation."}, 400
+    if (
+        reservation.get("status") != ReservationStatus.APPROVED.value
+        or reservation.get("actual_return") is not None
+    ):
+        return {"error": "This book is not awaiting return."}, 409
+
+    try:
+        return_date = date.fromisoformat(actual_return)
+    except (TypeError, ValueError):
+        return {"error": "actual_return must be an ISO date."}, 400
+
+    updated = data_access.update(
+        "reservation",
+        reservation_id,
+        {"actual_return": return_date},
+    )
+    data_access.update(
+        "book",
+        reservation["resource_id"],
+        {"status": ResourceStatus.AVAILABLE.value},
+    )
+
+    return updated, 200

@@ -19,7 +19,7 @@ def test_create_book_model_in_file(temp_data_dir):
     record = data_access.create("book", data)
     print(record)
 
-    assert record["id"] == 29300001
+    assert record["id"] == 29200001
     assert record["resource_type"] == "book"
     assert record["name"] == "Animal Farm"
 
