@@ -4,7 +4,7 @@
         "author": "SALISES",
         "price": 4500.0,
         "genre": "Economics",
-        "status": "reserved",
+        "status": "borrowed",
         "condition": "good",
         "id": 29200001
     },
@@ -16,5 +16,14 @@
         "status": "available",
         "condition": "good",
         "id": 29200002
+    },
+    {
+        "name": "Demo: Policy Monograph",
+        "author": "SALISES",
+        "price": 3800.0,
+        "genre": "Policy",
+        "status": "borrowed",
+        "condition": "good",
+        "id": 29200003
     }
 ]

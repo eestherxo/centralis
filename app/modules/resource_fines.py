@@ -384,7 +384,7 @@ def generate_receipt(logged_in_user_id, fine_id):
         "resource_name": details["resource_name"],
         "fine_type": fine["reason"],
         "amount_paid": fine["amount"],
-        "payment_date": fine["date_paid"],
+        "payment_date": fine.get("date_paid") or fine.get("date_issued") or "N/A",
     }
 
 

@@ -31,8 +31,17 @@
         "reservation_type": "book",
         "status": "approved",
         "request_date": "2026-11-24",
-        "expected_return": "2026-12-08",
-        "actual_return": null,
+        "expected_return": "2026-11-22",
         "id": 69600003
+    },
+    {
+        "demo_key": "demo-reservation-4",
+        "visitor_id": 19100003,
+        "resource_id": 29200003,
+        "reservation_type": "book",
+        "status": "approved",
+        "request_date": "2026-11-24",
+        "expected_return": "2026-12-08",
+        "id": 69600004
     }
 ]
