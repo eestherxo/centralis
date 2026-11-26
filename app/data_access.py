@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from datetime import datetime, date
+from datetime import datetime, date, time
 from typing import Any
 from enum import Enum
 
@@ -26,7 +26,7 @@ class JSONEncoder(json.JSONEncoder):
     def default(self, o: Any) -> Any:
 
         # convert date object to ISO format
-        if isinstance(o, (datetime, date)):
+        if isinstance(o, (datetime, date, time)):
             return o.isoformat()
 
         # extract value attribute of enums

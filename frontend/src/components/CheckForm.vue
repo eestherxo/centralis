@@ -1,41 +1,29 @@
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref } from 'vue'
 import { post, fmt } from '../api'
+import VisitPurpose from './VisitPurpose.vue'
 
-const props = defineProps({ prefill: Object })
+defineProps({ session: { type: Object, default: null } })
 
-const mode = ref('id') // 'id' or 'phone'
-const form = reactive({ id_number: '', phone_number: '', purpose: '' })
+const form = reactive({ visitor_id: '', purpose: '' })
 const errors = ref({})
 const banner = ref(null)
 const busy = ref(false)
-
-watch(
-  () => props.prefill,
-  (p) => {
-    if (!p) return
-    mode.value = p.mode
-    form.id_number = p.id_number || ''
-    form.phone_number = p.phone_number || ''
-    form.purpose = p.purpose || ''
-    errors.value = {}
-    banner.value = { ok: false, text: p.message }
-  },
-  { immediate: true },
-)
-
-function setMode(next) {
-  mode.value = next
-  errors.value = {}
-}
+const formElement = ref(null)
+const purposeForm = ref(null)
 
 async function submit(kind) {
   errors.value = {}
   banner.value = null
+  if (kind === 'check-in' &&
+      (purposeForm.value?.validate() === false || !formElement.value?.reportValidity())) return
 
-  const body = mode.value === 'id'
-    ? { id_number: form.id_number }
-    : { phone_number: form.phone_number }
+  const visitorId = Number(form.visitor_id)
+  if (!Number.isSafeInteger(visitorId) || visitorId <= 0) {
+    errors.value = { visitor_id: 'Enter a valid visitor ID.' }
+    return
+  }
+  const body = { visitor_id: visitorId }
   if (kind === 'check-in') body.purpose = form.purpose
 
   busy.value = true
@@ -43,8 +31,11 @@ async function submit(kind) {
     const { ok, data } = await post(`/visitors/${kind}`, body)
     if (ok) {
       const when = kind === 'check-in' ? data.visit.check_in : data.visit.check_out
-      banner.value = { ok: true, text: `${data.message} ${fmt(when)}.` }
-      form.id_number = form.phone_number = form.purpose = ''
+      banner.value = {
+        ok: true,
+        text: `${data.message} ${fmt(when)}.`,
+      }
+      form.visitor_id = form.purpose = ''
     } else {
       errors.value = data.fields || {}
       banner.value = { ok: false, text: data.error || 'Something went wrong.' }
@@ -58,25 +49,14 @@ async function submit(kind) {
 </script>
 
 <template>
-  <form novalidate @submit.prevent>
-    <div class="seg">
-      <button type="button" :class="{ active: mode === 'id' }" @click="setMode('id')">I have an ID number</button>
-      <button type="button" :class="{ active: mode === 'phone' }" @click="setMode('phone')">Use phone number</button>
-    </div>
-
-    <label v-if="mode === 'id'">ID number
-      <input v-model="form.id_number" :class="{ bad: errors.id_number }" placeholder="e.g. 620123456" />
-      <span class="err">{{ errors.id_number }}</span>
-    </label>
-    <label v-else>Phone number
-      <input v-model="form.phone_number" type="tel" :class="{ bad: errors.phone_number || errors.id_number }" placeholder="876 123 4567" />
-      <span class="err">{{ errors.phone_number || errors.id_number }}</span>
+  <form ref="formElement" novalidate @submit.prevent>
+    <label>Visitor ID
+      <input v-model="form.visitor_id" :class="{ bad: errors.visitor_id }" placeholder="Enter visitor ID" required />
+      <span class="err">{{ errors.visitor_id }}</span>
     </label>
 
-    <label>Purpose of visit <small>(needed to check in)</small>
-      <input v-model="form.purpose" :class="{ bad: errors.purpose }" placeholder="e.g. Research" />
-      <span class="err">{{ errors.purpose }}</span>
-    </label>
+    <VisitPurpose ref="purposeForm" v-model="form.purpose" simple />
+    <span class="err">{{ errors.purpose }}</span>
 
     <div class="row">
       <button class="btn" type="button" :disabled="busy" @click="submit('check-in')">Check in</button>

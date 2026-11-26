@@ -1,0 +1,29 @@
+[
+    {
+        "student_id": "DEMO-UG-001",
+        "name": "Maya Brown",
+        "phone_number": "876-555-0101",
+        "type": "undergraduate",
+        "faculty": "Social Sciences",
+        "purpose": "Research",
+        "id": 19100001
+    },
+    {
+        "student_id": "DEMO-PG-001",
+        "name": "Daniel King",
+        "phone_number": "876-555-0102",
+        "type": "postgraduate",
+        "faculty": "Humanities",
+        "purpose": "Consultation",
+        "id": 19100002
+    },
+    {
+        "student_id": null,
+        "name": "Leah Grant",
+        "phone_number": "876-555-0103",
+        "type": "external",
+        "faculty": null,
+        "purpose": "Seminar",
+        "id": 19100003
+    }
+]

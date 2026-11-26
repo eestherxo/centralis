@@ -1,218 +1,163 @@
 from datetime import datetime
 
 import pytest
-from flask import Flask
 
 from app import data_access
-from app.routes.visitors import visitors_bp
+from run import app
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(data_access, "DB_DIR", tmp_path)
-    app = Flask(__name__)
-    app.register_blueprint(visitors_bp)
-    return app.test_client()
+    monkeypatch.setitem(app.config, "TESTING", True)
+    monkeypatch.setitem(app.config, "JWT_SECRET_KEY", "test-secret-key-that-is-long-enough-123")
+    with app.test_client() as test_client:
+        yield test_client
 
 
-def visitor_data(**overrides):
+def student_data(**changes):
     data = {
-        "name": "Taylor Smith",
-        "phone_number": "555-0123",
-        "id_number": "ID-123",
-        "faculty": "Science",
-        "purpose": "Research",
-        "type": "undergraduate",
+        "name": "Taylor Smith", "phone_number": "876-555-0123",
+        "student_id": "STU-123", "faculty": "Science",
+        "purpose": "Research", "type": "undergraduate",
     }
-    data.update(overrides)
+    data.update(changes)
     return data
 
 
-def test_registration_saves_visitor_and_initial_check_in(client):
-    response = client.post("/visitors/register", json=visitor_data())
+def test_registration_creates_visitor_and_open_visit(client):
+    response = client.post("/visitors/register", json=student_data())
 
     assert response.status_code == 201
-    body = response.get_json()
-    assert body["message"] == "Visitor registered and checked in successfully."
-    assert body["visitor"]["id_number"] == "ID-123"
-    assert datetime.fromisoformat(body["visit"]["check_in"])
-    assert body["visit"]["check_out"] is None
-
-
-def test_registration_rejects_missing_and_invalid_fields(client):
-    missing = client.post(
-        "/visitors/register", json=visitor_data(phone_number=" ")
-    )
-    invalid_type = client.post(
-        "/visitors/register", json=visitor_data(type="invalid")
-    )
-
-    assert missing.status_code == 400
-    assert "phone_number" in missing.get_json()["fields"]
-    assert invalid_type.status_code == 400
-    assert "type" in invalid_type.get_json()["fields"]
-    assert data_access.get_all_records("visitor") == []
+    assert response.json["visitor"]["student_id"] == "STU-123"
+    assert response.json["visit"]["visitor_id"] == response.json["visitor"]["id"]
+    assert response.json["visit"]["check_out"] is None
+    assert datetime.fromisoformat(response.json["visit"]["check_in"])
+    assert len(data_access.get_all_records("visitor")) == 1
+    assert len(data_access.get_all_records("visit")) == 1
 
 
 @pytest.mark.parametrize("visitor_type", ["undergraduate", "postgraduate"])
-def test_student_registration_requires_id_number(client, visitor_type):
-    response = client.post(
-        "/visitors/register",
-        json=visitor_data(type=visitor_type, id_number=""),
-    )
+def test_student_registration_requires_student_fields(client, visitor_type):
+    response = client.post("/visitors/register", json=student_data(
+        type=visitor_type, student_id="", faculty="",
+    ))
 
     assert response.status_code == 400
-    assert "id_number" in response.get_json()["fields"]
+    assert {"student_id", "faculty"} <= response.json["fields"].keys()
     assert data_access.get_all_records("visitor") == []
 
 
 def test_external_registration_does_not_require_student_fields(client):
-    response = client.post(
-        "/visitors/register",
-        json=visitor_data(type="external", id_number=None, faculty=None),
-    )
+    response = client.post("/visitors/register", json={
+        "name": "Morgan Brown", "phone_number": "876-555-0456",
+        "purpose": "Seminar", "type": "external",
+    })
 
     assert response.status_code == 201
-    visitor = response.get_json()["visitor"]
-    assert visitor["id_number"] is None
-    assert visitor["faculty"] is None
+    assert response.json["visitor"]["student_id"] is None
+    assert response.json["visitor"]["faculty"] is None
 
 
-def test_external_registration_rejects_an_id_number(client):
-    response = client.post(
-        "/visitors/register",
-        json=visitor_data(type="external", id_number="ID-123"),
-    )
+def test_external_registration_rejects_student_id(client):
+    response = client.post("/visitors/register", json=student_data(
+        type="external", student_id="STU-123",
+    ))
 
     assert response.status_code == 400
-    assert "id_number" in response.get_json()["fields"]
+    assert "student_id" in response.json["fields"]
+
+
+def test_registration_rejects_invalid_fields_and_type(client):
+    missing = client.post("/visitors/register", json=student_data(phone_number=" "))
+    invalid_type = client.post("/visitors/register", json=student_data(type="visitor"))
+    no_json = client.post("/visitors/register", data="invalid", content_type="text/plain")
+
+    assert missing.status_code == 400
+    assert "phone_number" in missing.json["fields"]
+    assert invalid_type.status_code == 400
+    assert "type" in invalid_type.json["fields"]
+    assert no_json.status_code == 400
     assert data_access.get_all_records("visitor") == []
 
 
-def test_duplicate_registration_is_rejected(client):
-    client.post("/visitors/register", json=visitor_data())
+def test_duplicate_student_registration_is_rejected_case_insensitively(client):
+    assert client.post("/visitors/register", json=student_data()).status_code == 201
 
-    response = client.post(
-        "/visitors/register", json=visitor_data(id_number=" id-123 ")
-    )
+    duplicate = client.post("/visitors/register", json=student_data(student_id=" stu-123 "))
 
-    assert response.status_code == 409
+    assert duplicate.status_code == 409
     assert len(data_access.get_all_records("visitor")) == 1
+    assert len(data_access.get_all_records("visit")) == 1
 
 
-def test_check_in_and_check_out_create_visit_timestamps(client):
-    registration = client.post("/visitors/register", json=visitor_data())
-    visitor_id = registration.get_json()["visitor"]["id"]
-    initial_visit_id = registration.get_json()["visit"]["id"]
-    client.post(
-        "/visitors/check-out", json={"id_number": "ID-123"}
-    )
+def test_external_duplicate_matches_name_and_phone(client):
+    data = {
+        "name": "Morgan Brown", "phone_number": "876-555-0456",
+        "purpose": "Seminar", "type": "external",
+    }
+    assert client.post("/visitors/register", json=data).status_code == 201
+    duplicate = client.post("/visitors/register", json={
+        **data, "name": " morgan brown ", "phone_number": "(876) 555-0456",
+    })
 
-    check_in = client.post(
-        "/visitors/check-in",
-        json={"id_number": "ID-123", "purpose": "Consultation"},
-    )
-    check_out = client.post(
-        "/visitors/check-out", json={"id_number": "ID-123"}
-    )
+    assert duplicate.status_code == 409
+
+
+def test_check_in_and_check_out_use_visitor_id(client):
+    registration = client.post("/visitors/register", json=student_data())
+    visitor_id = registration.json["visitor"]["id"]
+    client.post("/visitors/check-out", json={"visitor_id": visitor_id})
+
+    check_in = client.post("/visitors/check-in", json={
+        "visitor_id": visitor_id, "purpose": "Consultation",
+    })
+    check_out = client.post("/visitors/check-out", json={"visitor_id": visitor_id})
 
     assert check_in.status_code == 201
-    assert check_in.get_json()["visit"]["visitor_id"] == visitor_id
-    assert check_in.get_json()["visit"]["purpose"] == "Consultation"
-    assert datetime.fromisoformat(check_in.get_json()["visit"]["check_in"])
+    assert check_in.json["visit"]["purpose"] == "Consultation"
+    assert check_in.json["visit"]["visitor_id"] == visitor_id
     assert check_out.status_code == 200
-    assert datetime.fromisoformat(check_out.get_json()["visit"]["check_out"])
-    assert data_access.get_record("visit", initial_visit_id)["check_out"] is not None
+    assert check_out.json["visit"]["check_out"] is not None
     assert len(data_access.get_all_records("visit")) == 2
 
 
-def test_check_in_is_rejected_while_previous_visit_is_active(client):
-    client.post("/visitors/register", json=visitor_data())
+def test_check_in_rejects_existing_active_visit(client):
+    registered = client.post("/visitors/register", json=student_data())
+    visitor_id = registered.json["visitor"]["id"]
 
-    response = client.post(
-        "/visitors/check-in",
-        json={"id_number": "ID-123", "purpose": "Another visit"},
-    )
+    duplicate = client.post("/visitors/check-in", json={
+        "visitor_id": visitor_id, "purpose": "Another visit",
+    })
 
-    assert response.status_code == 409
+    assert duplicate.status_code == 409
     assert len(data_access.get_all_records("visit")) == 1
 
 
-def test_check_out_without_active_check_in_is_rejected(client):
-    client.post("/visitors/register", json=visitor_data())
-    client.post("/visitors/check-out", json={"id_number": "ID-123"})
+@pytest.mark.parametrize("payload", [{}, {"visitor_id": True}, {"visitor_id": -1}])
+def test_check_in_rejects_missing_or_invalid_details(client, payload):
+    response = client.post("/visitors/check-in", json={"purpose": "Research", **payload})
 
-    response = client.post(
-        "/visitors/check-out", json={"id_number": "ID-123"}
-    )
-
-    assert response.status_code == 409
-    assert len(data_access.get_all_records("visit")) == 1
+    assert response.status_code == 400
 
 
-def test_external_visitor_can_check_in_and_out_by_visitor_id(client):
-    registration = client.post(
-        "/visitors/register",
-        json=visitor_data(type="external", id_number="", faculty=""),
-    )
-    visitor_id = registration.get_json()["visitor"]["id"]
-
-    check_out = client.post(
-        "/visitors/check-out", json={"visitor_id": visitor_id}
-    )
-    check_in = client.post(
-        "/visitors/check-in",
-        json={"visitor_id": visitor_id, "purpose": "Consultation"},
-    )
-
-    assert check_out.status_code == 200
-    assert check_in.status_code == 201
-    assert check_in.get_json()["visit"]["visitor_id"] == visitor_id
+def test_check_in_unknown_visitor_returns_not_found(client):
+    response = client.post("/visitors/check-in", json={
+        "visitor_id": 19100001, "purpose": "Research",
+    })
+    assert response.status_code == 404
 
 
-def test_visitor_can_check_in_and_out_by_phone_number(client):
-    registration = client.post(
-        "/visitors/register",
-        json=visitor_data(type="external", id_number="", faculty=""),
-    )
-    visitor_id = registration.get_json()["visitor"]["id"]
+def test_check_out_without_active_visit_returns_conflict(client):
+    registered = client.post("/visitors/register", json=student_data())
+    visitor_id = registered.json["visitor"]["id"]
+    client.post("/visitors/check-out", json={"visitor_id": visitor_id})
 
-    check_out = client.post(
-        "/visitors/check-out", json={"phone_number": "555-0123"}
-    )
-    check_in = client.post(
-        "/visitors/check-in",
-        json={"phone_number": "555-0123", "purpose": "Consultation"},
-    )
-    check_out_again = client.post(
-        "/visitors/check-out", json={"phone_number": "555-0123"}
-    )
-
-    assert check_out.status_code == 200
-    assert check_out.get_json()["visit"]["visitor_id"] == visitor_id
-    assert check_in.status_code == 201
-    assert check_in.get_json()["visit"]["visitor_id"] == visitor_id
-    assert check_out_again.status_code == 200
-    assert datetime.fromisoformat(check_out_again.get_json()["visit"]["check_out"])
-
-
-def test_phone_number_lookup_rejects_ambiguous_visitors(client):
-    client.post(
-        "/visitors/register",
-        json=visitor_data(id_number="ID-123"),
-    )
-    client.post(
-        "/visitors/register",
-        json=visitor_data(id_number="ID-456"),
-    )
-
-    response = client.post(
-        "/visitors/check-out", json={"phone_number": "555-0123"}
-    )
+    response = client.post("/visitors/check-out", json={"visitor_id": visitor_id})
 
     assert response.status_code == 409
-    assert "phone_number" in response.get_json()["fields"]
-    assert all(
-        visit["check_out"] is None
-        for visit in data_access.get_all_records("visit")
-    )
+
+
+def test_check_out_unknown_visitor_returns_not_found(client):
+    response = client.post("/visitors/check-out", json={"visitor_id": 19100001})
+    assert response.status_code == 404

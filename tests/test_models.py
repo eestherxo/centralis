@@ -29,14 +29,14 @@ def test_undergraduate_visitor_model():
         "555-0123",
         VisitorType.UNDERGRAD,
         "library research",
-        student_id=123456,
+        student_id="123456",
         faculty="Science",
     )
     data = visitor.to_dict()
     print(f"\n{data}\n")
 
     assert visitor.type is VisitorType.UNDERGRAD
-    assert visitor.student_id == 123456
+    assert visitor.student_id == "123456"
     assert visitor.faculty == "Science"
 
 
@@ -191,9 +191,6 @@ def test_book_reservation_model():
         visitor=22,
         resource=1,
         request_date=date(2026, 11, 1),
-        start_time=time(9, 0),
-        end_time=time(9, 15),
-        reserve_date=date(2026, 11, 21),
         expected_return=date(2026, 12, 5),
         actual_return=date(2026, 12, 4),
     )
@@ -244,4 +241,5 @@ def test_sale_model():
         "quantity": 2,
         "sale_amount": 17.0,
         "date_sold": date(2026, 11, 18),
+        "payment_confirmed": False,
     }
